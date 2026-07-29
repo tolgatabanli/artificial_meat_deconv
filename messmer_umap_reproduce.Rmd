@@ -1,0 +1,47 @@
+
+
+```{r}
+library(Seurat)
+library(sctransform)
+```
+
+```{r}
+counts <- data.table::fread('/nfs/data2/huji_artificial_meat/deconvolution_data/external_sc_references/messmer2023_GSE211428/GSE211428_combined_counts.tsv.gz')
+# index is in the first col (V1)
+genes <- counts[[1]]
+mat <- as.matrix(counts[, -1])
+rownames(mat) <- genes
+
+col_meta <- data.table::fread('/nfs/data2/huji_artificial_meat/deconvolution_data/external_sc_references/messmer2023_GSE211428/GSE211428_combined_meta.tsv.gz')
+
+gc()
+messner2023 <- CreateSeuratObject(counts = mat, meta.data = col_meta)
+```
+
+```{r}
+unique(messner2023$predicted.pheno)
+```
+
+
+```{r}
+filtered <- messner2023[, messner2023$orig.ident == "Injection1"]
+seurat_obj <- SCTransform(
+  filtered,
+  #vars.to.regress = c("percent.mt", "nCount_RNA", "nFeature_RNA", "S.Score", "G2M.Score"),
+  verbose = TRUE,
+  variable.features.n = 3000,
+  vst.flavor = "v2", # set for when matrixStats package errs
+)
+
+seurat_obj <- RunPCA(seurat_obj, verbose = FALSE)
+#seurat_obj <- FindNeighbors(seurat_obj, dims = 1:50)
+#seurat_obj <- FindClusters(seurat_obj, resolution=0.1)
+
+set.seed(2023)
+seurat_obj <- RunUMAP(seurat_obj, dims = 1:30, verbose = T, n.neighbors = 50, min.dist = 0.1)
+seurat_obj$predicted.pheno <- recode(seurat_obj$predicted.pheno, "Monocytes - M?" = "Monocytes - MΦ")
+
+DimPlot(seurat_obj, label = T, group.by = "predicted.pheno", repel = T, pt.size = 0.1)
+ggsave(filename = "~/artifical_meat_deconv/reproduced_timepoint1.png", width = 9, height = 6)
+```
+

@@ -1,0 +1,41 @@
+---
+title: "wang2023_deconv.Rmd"
+author: "Tolga Tabanli"
+date: "2026-05-22"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(omnideconv)
+```
+
+```{r}
+# count matrix
+counts <- data.table::fread("/nfs/data2/huji_artificial_meat/deconvolution_data/external_sc_references/Wang2023/GSE205347_Complete_10x_cattle_normalized_counts_data.csv.gz")
+mat <- as.matrix(counts[, -1])
+rownames(mat) <- counts$V1
+
+# column metadata
+metadata <- data.table::fread("/nfs/data2/huji_artificial_meat/deconvolution_data/external_sc_references/Wang2023/GSE205347_Complete_10x_cattle_Metadata.csv.gz")
+#normalized_counts <- data.table::fread("/nfs/data2/huji_artificial_meat/deconvolution_data/external_sc_references/Wang2023/GSE205347_Complete_10x_cattle_normalized_counts_data.csv.gz")
+metadata$V1 <- gsub("-", ".",metadata$V1)
+
+
+metadata <- metadata[metadata$V1 %in% colnames(mat), ]
+nrow(metadata)
+
+metadata <- metadata[match(colnames(mat), metadata$V1), ]
+all(metadata$V1 == colnames(mat))
+
+omnideconv::build_model_dwls(single_cell_object = mat,
+                             cell_type_annotations = metadata$lables,
+                             dwls_method = "mast_optimized",
+                             path = "wang2023_dwls_signature",
+                             verbose = T, ncores = 7)
+```
+

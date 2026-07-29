@@ -1,0 +1,152 @@
+---
+title: "signature_goenrichment"
+output: html_document
+date: "2026-05-19"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, fig.width = 8, fig.height = 12}
+library(gprofiler2)
+library(ggplot2)
+
+load('/nfs/home/students/t.tabanli/artifical_meat_deconv/sig_dwls_messmer_recreated_counts/Sig.RData')
+
+# option 2
+gene_sets <- lapply(colnames(Sig), function(ct) {
+  vals <- Sig[, ct]^0.1
+  vals <- vals[vals > 0.3]
+  names(vals)
+})
+names(gene_sets) <- colnames(Sig)
+
+# option 1
+cell_type <- colnames(Sig)[max.col(Sig, ties.method = "first")]
+gene_sets  <- split(rownames(Sig), cell_type)
+
+
+# GO enrichment per cell type (gprofiler2 handles bovine Ensembl IDs natively)
+go_sources <- c("GO:MF", "GO:CC", "GO:BP")
+
+go_results <- lapply(names(gene_sets), function(ct) {
+  res_list <- lapply(go_sources, function(src) {
+    res <- gost(query       = gene_sets[[ct]],
+                organism    = "btaurus",
+                sources     = src,
+                significant = TRUE)$result
+    if (is.null(res) || nrow(res) == 0) return(NULL)
+    res$cell_type <- ct
+    res$go_cat    <- src
+    head(res[order(res$p_value), ], 2)
+  })
+  do.call(rbind, res_list)
+})
+
+top <- do.call(rbind, go_results)
+top$log10p <- -log10(top$p_value)
+
+ggplot(top, aes(x = log10p,
+                y = reorder(term_name, log10p),
+                fill = go_cat)) +
+  geom_col() +
+  facet_wrap(~ cell_type, scales = "free_y", ncol = 2) +
+  labs(x = "-log10(p)", y = NULL, fill = "GO category") +
+  theme_minimal()
+
+```
+
+
+```{r, fig.height=5}
+Sig %>% as.data.frame() %>%
+  pivot_longer(everything(), names_to = "cell_type", values_to = "value") %>%
+  ggplot(aes(x = cell_type, y = log(value))) +
+  geom_violin() +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+
+colMeans(Sig == 0) %>% as.data.frame() %>% rownames_to_column("cell_type") %>%
+  rename(sparsity_mean = ".") %>%
+  ggplot(aes(x = cell_type, y = sparsity_mean)) +
+    geom_bar(stat = "identity") + theme_minimal() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+
+rowSums(Sig > 0) %>% hist(main = "Cell Type Specificity", xlab = "Number of Celltypes the gene has > 0", ylab = "Freq. of Genes")
+
+ cor(Sig, method = "spearman") %>%
+    pheatmap::pheatmap()
+
+```
+
+
+```{r, fig.width=30}
+library(fgsea)
+library(org.Bt.eg.db)
+library(AnnotationDbi)
+library(GO.db)
+library(tidytext)
+library(ggh4x)
+
+# Build GO gene sets from btaurus annotation
+go_anno <- AnnotationDbi::select(
+  org.Bt.eg.db,
+  keys     = keys(org.Bt.eg.db, keytype = "ENSEMBL"),
+  columns  = c("ENSEMBL", "GOALL", "ONTOLOGYALL"),
+  keytype  = "ENSEMBL"
+) %>% filter(!is.na(GOALL))
+
+make_go_sets <- function(ont) {
+    sub <- go_anno[go_anno$ONTOLOGYALL == ont, ]
+    lapply(split(sub$ENSEMBL, sub$GOALL), unique)
+  }
+
+
+go_sets <- list(
+  "GO:BP" = make_go_sets("BP")
+  #"GO:MF" = make_go_sets("MF"),
+  #"GO:CC" = make_go_sets("CC")
+)
+
+# GSEA per cell type, using Sig column as ranked score
+rel_score <- function(ct) {
+    #others <- setdiff(colnames(Sig), ct)
+    #log2((Sig[, ct] + 1e-6) / (rowMeans(Sig[, others]) + 1e-6))
+  Sig[, ct]^0.05
+}
+
+gsea_results <- lapply(colnames(Sig), function(ct) {
+  ranked <- sort(rel_score(ct), decreasing = TRUE)
+
+  res_list <- lapply(names(go_sets), function(src) {
+    res <- fgsea(pathways    = go_sets[[src]],
+                 stats       = ranked,
+                 minSize     = 10,
+                 maxSize     = 500,
+                 scoreType   = "pos",
+                 nPermSimple = 10000)
+    res$cell_type <- ct
+    res <- res[!is.na(res$padj), ]
+    if (nrow(res) == 0) return(NULL)
+    head(res[order(res$padj, res$size), ], 10)
+  })
+  do.call(rbind, res_list)
+})
+
+top <- do.call(rbind, gsea_results)
+
+top$term_name <- mapIds(GO.db, keys = top$pathway,
+                        column = "TERM", keytype = "GOID")
+
+top %>%
+  filter(padj < 0.05) %>%
+  mutate(log10p = -log10(padj),
+         term_name = reorder_within(term_name, log10p, cell_type)) %>%
+  ggplot(aes(x = log10p, y = term_name)) +
+  geom_col() +
+  scale_y_reordered() +
+  facet_wrap(~ cell_type, scales = "free_y", ncol = 4) +
+  labs(x = "-log10(padj)", y = NULL) +
+  theme_minimal()
+
+```
+

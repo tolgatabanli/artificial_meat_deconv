@@ -1,0 +1,387 @@
+---
+title: "Messmer Signature"
+output: html_document
+date: "2026-04-18"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+```{r library}
+library(omnideconv)
+library(tidyverse)
+suppressMessages(conflicted::conflict_prefer_all("dplyr"))
+
+library(ggpubr)
+library(pals)
+```
+
+# Signature Building
+
+For the deconvolution's signature matrix, a single-cell reference data set by
+Messmer et al., 2023 will be used.
+Authors have saved annotated cell types in `predicted.pheno` in the metadata.
+Since the authors used a mixed symbol and Ensembl ID in their matrix (for their own purpose) but
+the features TSV of the individual injections contain the original IDs in the
+same order, these Ensembl IDs from the features.tsv.gz will be used.
+
+```{r read-counts}
+counts <- data.table::fread('/nfs/home/students/t.tabanli/artifical_meat_deconv/messmer_counts/GSE211428_counts.tsv.gz')
+mat <- as.matrix(counts[, -1])
+rownames(mat) <- counts$V1
+
+col_meta <- data.table::fread('/nfs/data2/huji_artificial_meat/deconvolution_data/external_sc_references/messmer2023_GSE211428/GSE211428_combined_meta.tsv.gz')
+col_meta <- as.data.frame(col_meta)
+col_meta$seurat_barcode <- gsub("^(.*)\\.([0-9]+)_([0-9]+)$", "Inj\\3_\\1-\\2", col_meta$Unique_barcode)
+rownames(col_meta) <- col_meta$seurat_barcode
+col_meta$V1 <- NULL
+col_meta$seurat_barcode <- NULL
+
+
+# make the names path-compatible, since DWLS creates dirs
+col_meta$predicted.pheno <- gsub("/", "-", col_meta$predicted.pheno)
+gc()
+
+cat("colnames(mat):", length(colnames(mat)), "\n")
+cat("col_meta barcodes:", nrow(col_meta), "\n")
+cat("Intersection:", length(intersect(colnames(mat), rownames(col_meta))), "\n")
+cat("In mat not in col_meta:", length(setdiff(colnames(mat), rownames(col_meta))), "\n")
+cat("In col_meta not in mat:", length(setdiff(rownames(col_meta), colnames(mat))), "\n")
+  
+common <- intersect(colnames(mat), rownames(col_meta))
+mat <- mat[, common]
+col_meta <- col_meta[common, ]
+```
+
+
+First, we are plotting the occurrences of cell types annotated by the authors.
+Y-axis is log-transformed for the in-box numbers to fit.
+
+```{r celltype-occurrences, fig.height=5}
+table(paste0(col_meta$orig.ident, "_", col_meta$predicted.pheno)) %>%
+  as.data.frame() %>%
+  separate_wider_delim(cols = Var1, delim = "_", names = c("injection", "cell_type")) %>%
+  ggplot(aes(x = cell_type, y = Freq, fill = injection)) +
+  geom_bar(stat = "identity") +
+  scale_y_log10() +
+  geom_text(aes(label = Freq), position = position_stack(vjust = 0.5)) +
+  labs(x = "", y = "Count") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust=1, size = 11), panel.grid.major.x = element_blank())
+ggsave("~/artifical_meat_deconv/images/distro_cell_types.png", width = 8, height = 5)
+```
+
+They are not equally represented. FAPs, SCs, and VECs tend to occur much more
+frequently.
+This might induce a bias later in the signature building step depending on
+how a method deals with abundance.
+
+## DWLS Signature
+
+Next, we build the signature. This method creates intermediate statistical test files
+in the dir given as path to build the signature from ('Sig.Rdata').
+We build two signatures from the same reference data set, once with all cells
+and once with tenocytes excluded.
+The reason is the overlap of tenocytes with FAPs in the atlas provided by the authors.
+This might point to the fact that FAPs and tenocytes are possibly characterized
+closely and might be hard to distinguish.
+Tenocytes constitute a very small portion of the data set and they could skew the deconvolution.
+
+```{r build-signature, eval=FALSE}
+omnideconv::build_model_dwls(single_cell_object = mat,
+                        cell_type_annotations = col_meta$predicted.pheno,
+                        dwls_method = "mast_optimized",
+                        path = "tolga_combined_signatures/messmer_dwls_signature",
+                        verbose = T, ncores = 6) # TODO: defaults: diff_cutoff = 0.5, pval_cutoff = 0.01
+
+# without tenocytes
+noTenocyte_index <- col_meta$predicted.pheno != "Tenocytes"
+omnideconv::build_model_dwls(single_cell_object = mat[, noTenocyte_index],
+                        cell_type_annotations = col_meta$predicted.pheno[noTenocyte_index],
+                        dwls_method = "mast_optimized",
+                        path = "tolga_combined_signatures/messmer_dwls_signature_noTenocyte",
+                        verbose = T, ncores = 10)
+```
+
+How close are the signatures of tenocytes and FAPs?
+We first take Jaccard similarity based on genes that have a weight larger
+than 0. This means, the intersection genes have a nonzero score in **both**
+cell types and the union genes have a nonzero score in **any** of the two types.
+
+Second, we plot the signature weights of the genes in the intersection to see
+how well they correlate.
+
+```{r signature-check, eval = FALSE}
+# for the markdown, this block is skipped and
+# the signature without tenocytes is used
+
+load('sig_dwls_messmer_recreated_counts/Sig.RData')
+
+fap_teno <- Sig %>% as.data.frame()
+fap_teno <- fap_teno %>%
+  rownames_to_column("genes") %>%
+  pivot_longer(cols = -genes, names_to = "type", values_to = "val") %>%
+  separate_wider_delim(type, delim = "_", names = c("injection", "cell_type")) %>%
+  pivot_wider(names_from = cell_type, values_from = val) %>%
+  select(genes, injection, FAPs, Tenocytes) %>%
+  drop_na()
+
+fap_genes <- fap_teno$genes[fap_teno$FAPs > 0]
+ten_genes <- fap_teno$genes[fap_teno$Tenocytes > 0]
+
+# jaccard similarity
+length(intersect(fap_genes, ten_genes)) / length(union(fap_genes, ten_genes))
+
+# correlation of common genes:
+fap_teno %>%
+  filter(FAPs > 0, Tenocytes > 0) %>%
+  ggplot(aes(x = FAPs, y = Tenocytes)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+  scale_x_log10() +
+  scale_y_log10() +
+  stat_cor(method = "pearson", label.x.npc = "left", label.y.npc = "top",
+           aes(label = paste(..r.label.., ..rr.label.., sep = "~`,`~")))
+
+```
+
+```{r signature-load, echo=FALSE}
+load('sig_dwls_messmer_recreated_counts/Sig.RData')
+load('sig_dwls_messmer_recreated_counts_timepoint1/Sig.RData')
+```
+
+
+# Deconvolution
+
+Before applying the deconvolution, here is a utility function to read
+TPM matrices of the bulk sequencing experiment.
+
+```{r func-def-read-tpm}
+read_tpm <- function(path) {
+  bulk_matrix <- data.table::fread(path)
+  
+  char_cols <- names(bulk_matrix)[sapply(bulk_matrix, is.character)]
+  if (length(char_cols) == 0) stop("No character column found for gene IDs.")
+  gene_col_name <- if ("gene_id" %in% char_cols) "gene_id" else char_cols[1]
+  if (length(char_cols) > 1) {
+    warning("Multiple character columns found: ", paste(char_cols, collapse = ", "),
+            ". Using '", gene_col_name, "' as gene identifiers; discarding others.", call. = FALSE)
+    }
+  gene_col <- bulk_matrix[[gene_col_name]]
+  bulk_matrix[, (char_cols) := NULL]
+  mat <- as.matrix(bulk_matrix)
+  rownames(mat) <- gene_col
+  return(mat)
+}
+```
+
+
+We read the TPM count matrices, apply the deconvolution and save the results.
+Adipogenesis has rownames as Ensembl gene IDs.
+Myogenesis has no rownames but two gene identifier columns: Ensembl IDs and gene names.
+Both adipogenesis and myogenesis bulk data have only Ensembl IDs as gene identifiers (n = 36075).
+With signature of all cell types, they have 944 genes in common, while
+with noTenocytes they have 764 in common.
+
+```{r read-tpms, eval=FALSE}
+bulk_matrix_adipo <- read_tpm('/nfs/data2/huji_artificial_meat/adipogenesis/adipogenesis_tpm.tsv')
+bulk_matrix_myo <- read_tpm('/nfs/data2/huji_artificial_meat/myogenesis/nfcore_out/star_salmon/salmon.merged.gene_tpm.tsv')
+
+length(intersect(rownames(Sig), rownames(bulk_matrix_adipo))) # 724
+length(intersect(rownames(Sig), rownames(bulk_matrix_myo)))
+
+comp_adipo <- deconvolute_dwls(bulk_gene_expression = bulk_matrix_adipo,
+                               signature = Sig,
+                               dwls_submethod = "DampenedWLS",
+                               verbose = T)
+comp_myo <- deconvolute_dwls(bulk_gene_expression = bulk_matrix_myo,
+                             signature = Sig,
+                             dwls_submethod = "DampenedWLS",
+                             verbose = T)
+
+saveRDS(comp_adipo, "sig_dwls_messmer_recreated_counts/adipo_compositions_messmer2023_dwls_signature.Rds")
+saveRDS(comp_myo, "sig_dwls_messmer_recreated_counts/myo_compositions_messmer2023_dwls_signature.Rds")
+```
+
+```{r read-tpms2, echo=FALSE}
+# for venn diagrams
+bulk_matrix_adipo <- read_tpm('/nfs/data2/huji_artificial_meat/adipogenesis/adipogenesis_tpm.tsv')
+colnames(bulk_matrix_adipo)
+bulk_matrix_myo <- read_tpm('/nfs/data2/huji_artificial_meat/myogenesis/nfcore_out/star_salmon/salmon.merged.gene_tpm.tsv')
+colnames(bulk_matrix_myo) <- gsub(".*_", "", colnames(bulk_matrix_myo))
+```
+
+
+## Sample mapping
+
+To map the samples to the experimental conditions, we read the samplesheets.
+Adipogenesis has a perfect matching, while in myogenesis
+we currently see gaps on both sides: unannotated samples in the count matrix
+and samples in the samplesheet that do not come up in the count matrix.
+
+```{r read-meta}
+bulk_meta_adipo <- read_csv('/nfs/data2/huji_artificial_meat/adipogenesis/sample_sheet_cleaned.csv', col_names = T) %>%
+  janitor::clean_names()
+bulk_meta_myo <- read_csv('/nfs/data2/huji_artificial_meat/myogenesis/sample_sheet_cleaned.csv', col_names = T) %>%
+  janitor::clean_names()
+
+bulk_meta_adipo <- bulk_meta_adipo %>%
+  select(library_name, sample_id, title, group, bio_replicate, individual, treatment, day) %>%
+  mutate(day = factor(day, levels = c("D0", "D2", "D3", "D6", "D14")))
+bulk_meta_myo <- bulk_meta_myo %>%
+  select(library_name, sample_id, group, day, bio_replicate, treatment) %>%
+  mutate(sample_id = gsub(".*_", "", sample_id)) %>%
+  mutate(day = factor(day, levels = c("d0", "d3", "d7", "d21")),
+         group = gsub("(?!Sat)D\\d*", "\\", group, perl = T)) %>%
+  separate_wider_delim(cols = group, delim = "_", names = c(NA, "group"), too_few = "align_end")
+```
+
+Once more, a visual representation of sample mapping issue using Venn diagrams:
+
+```{r venn, fig.width=10}
+# myogenesis -> NOT OKAY!
+ggVennDiagram::ggVennDiagram(list(Meta = bulk_meta_myo$sample_id, Matrix = colnames(bulk_matrix_myo)),
+                             label_size = 7, set_size = 7) +
+  coord_cartesian(xlim = c(-8, 8))
+
+# adipogenesis -> okay
+ggVennDiagram::ggVennDiagram(list(Meta = bulk_meta_adipo$sample_id, Matrix = colnames(bulk_matrix_adipo)),
+                             label_size = 7, set_size = 7) +
+  coord_cartesian(xlim = c(-8, 8))
+
+```
+
+## Compositional Results
+
+Here the compositional data are visualized by stacked bar plots with days as facets.
+LongNT and ShortNT are not relevant for this experiment, so me do not consider
+"group".
+
+```{r comp-results-adipo, fig.width=10, fig.height=5}
+comp_adipo <- readRDS('sig_dwls_messmer_recreated_counts_noTeno/adipo_compositions_messmer2023_dwls_signature.Rds')
+
+# preprocess and extract injection
+df_adipo <- comp_adipo %>% as.data.frame() %>%
+  rownames_to_column("sample_id") %>%
+  left_join(bulk_meta_adipo, by = "sample_id") %>%
+  pivot_longer(-c(library_name, sample_id, title, group, day, bio_replicate, individual, sex, treatment),
+               names_to="cell_type",
+               values_to="proportion") %>%
+  separate_wider_delim(cell_type, delim = "_", names = c("injection", "cell_type"))
+
+# Long
+p <- df_adipo %>%
+  ggplot(aes(x = sample_id, y = proportion, fill = cell_type)) +
+  geom_col(linewidth = 0.8) +
+  coord_flip() +
+  facet_grid(day ~ ., scales = "free_y", space = "free_y") +
+  scale_fill_manual(values = unname(pals::alphabet(n_distinct(df_adipo$cell_type))), name = "Cell type") +
+  theme_minimal() +
+  labs(y = "Proportion", x = NULL) +
+  theme(
+    strip.text.y.right   = element_text(angle = 0, hjust = 0.5, face = "bold"),
+    strip.background.y   = element_rect(fill = "gray90", color = "black", linewidth = 0.8),
+    panel.border         = element_rect(color = "gray70", fill = NA, linewidth = 0.4),
+    panel.spacing.y      = unit(0.3, "lines")
+  )
+
+p
+ggsave(filename = "~/artifical_meat_deconv/images/adipo_stacked_barplot.png", plot = p, width = 12)
+```
+
+```{r comp-results-myo, fig.width=10, fig.height=5}
+comp_myo <- readRDS('sig_dwls_messmer_recreated_counts_noTeno/myo_compositions_messmer2023_dwls_signature.Rds')
+rownames(comp_myo) <- gsub(".*_", "", rownames(comp_myo))
+
+cell_types <- colnames(comp_myo)
+
+joined_myo <- comp_myo %>%
+  as.data.frame() %>%
+  rownames_to_column("sample_id") %>%
+  left_join(bulk_meta_myo, by = "sample_id") %>%
+  drop_na()
+
+long_myo <- joined_myo %>%
+  pivot_longer(cols = cell_types, names_to = "cell_type", values_to = "proportion") %>%
+  separate_wider_delim(cell_type, delim = "_", names = c("injection", "cell_type"))
+
+p <- ggplot(long_myo, aes(x = bio_replicate, y = proportion, fill = cell_type)) +
+  geom_col() +
+  coord_flip() +
+  facet_wrap(day ~ group, scales = "free_y") +
+  scale_fill_manual(values = unname(pals::alphabet(n_distinct(long_myo$cell_type))), name = "Cell type") +
+  theme_minimal()
+
+p
+ggsave("~/artifical_meat_deconv/images/myo_stacked_barplot.png", width = 12)
+```
+
+Lastly, we plot heatmaps with sample-clustering and annotations.
+
+```{r heatmaps, fig.width=8, fig.height=5}
+# adipogenesis
+adipo_annot <- bulk_meta_adipo %>%
+  data.frame(row.names = bulk_meta_adipo$sample_id) %>%
+  select(sex, individual, day, group) %>%
+  mutate(individual = recode(individual, "FX (comment: tbd., ask Sharon)" = "FX"))
+pheatmap::pheatmap(t(comp_adipo), cluster_rows = F, cluster_cols = T,
+                   annotation_col = adipo_annot, filename = "~/artifical_meat_deconv/images/adipo_heatmap.png", width = 10, height = 7)
+
+comp_adipo_agg <- comp_adipo %>%
+  as.data.frame() %>%
+  rownames_to_column("sample_id") %>%
+  pivot_longer(-sample_id, names_to = "cell_type", values_to = "proportion") %>%
+  separate_wider_delim(cell_type, delim = "_", names = c("injection", "cell_type")) %>%
+  group_by(sample_id, cell_type) %>%
+  summarise(proportion = sum(proportion), .groups = "drop") %>%
+  pivot_wider(names_from = cell_type, values_from = proportion) %>%
+  column_to_rownames("sample_id") %>%
+  as.matrix()
+
+adipo_annot <- bulk_meta_adipo %>%
+  filter(sample_id %in% rownames(comp_adipo_agg)) %>%
+  mutate(individual = recode(individual, "FX (comment: tbd., ask Sharon)" = "FX")) %>%
+  select(sample_id, sex, individual, day, group) %>%
+  column_to_rownames("sample_id")
+
+comp_adipo_agg[rownames(comp_adipo_agg) %in% bulk_meta_adipo$sample_id, ] %>%
+  t() %>%
+  pheatmap::pheatmap(cluster_rows = FALSE, cluster_cols = TRUE,
+                     annotation_col = adipo_annot,
+                     filename = "~/artifical_meat_deconv/images/adipo_heatmap.png",
+                     width = 10, height = 6)
+
+# myogenesis
+myo_annot <- bulk_meta_myo %>%
+    filter(sample_id %in% rownames(comp_myo)) %>%
+    mutate(sex = recode(sex, "? ask Sharon" = "?")) %>%
+    select(sample_id, sex, day, group) %>%
+    column_to_rownames("sample_id")
+
+# aggregate injections
+comp_myo_agg <- comp_myo %>%
+    as.data.frame() %>%
+    rownames_to_column("sample_id") %>%
+    pivot_longer(-sample_id, names_to = "cell_type", values_to = "proportion") %>%
+    separate_wider_delim(cell_type, delim = "_", names = c("injection", "cell_type")) %>%
+    group_by(sample_id, cell_type) %>%
+    summarise(proportion = sum(proportion), .groups = "drop") %>%
+    pivot_wider(names_from = cell_type, values_from = proportion) %>%
+    column_to_rownames("sample_id") %>%
+    as.matrix()
+
+myo_annot <- bulk_meta_myo %>%
+  filter(sample_id %in% rownames(comp_myo_agg)) %>%
+  mutate(sex = recode(sex, "? ask Sharon" = "?")) %>%
+  select(sample_id, sex, day, group) %>%
+  column_to_rownames("sample_id")
+
+comp_myo_agg[rownames(comp_myo_agg) %in% bulk_meta_myo$sample_id, ] %>%
+  t() %>%
+  pheatmap::pheatmap(cluster_rows = FALSE, cluster_cols = TRUE,
+                     annotation_col = myo_annot,
+                     filename = "~/artifical_meat_deconv/images/myo_heatmap.png",
+                     width = 15, height = 6)
+```
+
