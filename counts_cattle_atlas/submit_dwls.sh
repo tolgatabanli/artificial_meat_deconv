@@ -3,7 +3,7 @@
 #SBATCH --job-name=cattle_dwls
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=40
-#SBATCH --mem=360G
+#SBATCH --mem=380G
 #SBATCH --time=18:00:00
 #SBATCH --partition=exbio-cpu
 #SBATCH --output=job_%x_%j.out
