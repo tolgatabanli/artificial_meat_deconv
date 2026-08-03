@@ -89,30 +89,28 @@ rownames(comp_myo_scaden) <- sxx_correct[gsub(".*_", "", rownames(comp_myo_scade
 ```
 
 ## Adipo compositions
-```{r, fig.width=10}
+```{r, fig.width=15}
 adipo_merged <- merge_methods(comp_adipo_dwls, comp_adipo_rectangle, comp_adipo_scaden, meta = bulk_meta_adipo, method_names = c("dwls", "rectangle", "scaden"))
 
 sig_cell_types <- adipo_merged %>%
-  group_by(cell_type, method) %>%
-  summarise(mean_prop = mean(proportion), .groups = "drop") %>%
-  filter(mean_prop > 0.01) %>%
-  pull(cell_type)
-sig_cell_types <- c(sig_cell_types, "Unknown")
+  filter(proportion > 0.05) %>%
+  pull(cell_type) %>% unique()
 
 df_adipo_plot <- adipo_merged %>%
-  mutate(cell_type = ifelse(cell_type %in% sig_cell_types, cell_type, "Other (< 1%)")) %>%
+  mutate(cell_type = ifelse(cell_type %in% sig_cell_types, cell_type, "Other (< 5%)")) %>%
   group_by(across(-proportion)) %>%
   summarise(proportion = sum(proportion), .groups = "drop")
 
-sig_names  <- sort(setdiff(unique(df_adipo_plot$cell_type), "Other (< 1%)"))
+sig_names  <- sort(setdiff(unique(df_adipo_plot$cell_type), "Other (< 5%)"))
 color_vals <- c(setNames(unname(pals::alphabet(length(sig_names))), sig_names),
-                "Other (< 1%)" = "gray70")
+                "Other (< 5%)" = "gray70")
+color_vals["Unknown"] <- "white"
 
 p <- df_adipo_plot %>%
   ggplot(aes(x = sample_id, y = proportion, fill = cell_type)) +
   geom_col(linewidth = 0.8) +
   coord_flip() +
-  facet_grid(day ~ method, scales = "free_y", space = "free_y") +
+  facet_grid(day + individual ~ method, scales = "free_y", space = "free_y") +
   scale_fill_manual(values = color_vals, name = "Cell type") +
   theme_minimal() +
   labs(y = "Proportion", x = NULL) +
@@ -125,31 +123,30 @@ p <- df_adipo_plot %>%
 p
 ```
 
-```{r, fig.width=10}
-myo_merged <- merge_methods(comp_myo_dwls, comp_myo_rectangle, meta = bulk_meta_myo, method_names = c("dwls", "rectangle"))
+```{r, fig.width=15}
+myo_merged <- merge_methods(comp_myo_dwls, comp_myo_rectangle, comp_myo_scaden, meta = bulk_meta_myo, method_names = c("dwls", "rectangle", "scaden"))
 
 sig_cell_types <- myo_merged %>%
-  group_by(cell_type, method) %>%
-  summarise(mean_prop = mean(proportion), .groups = "drop") %>%
-  filter(mean_prop > 0.01) %>%
-  pull(cell_type)
-sig_cell_types <- c(sig_cell_types, "Unknown")
+  filter(proportion > 0.05) %>%
+  pull(cell_type) %>% unique()
 
 df_myo_plot <- myo_merged %>%
-  mutate(cell_type = ifelse(cell_type %in% sig_cell_types, cell_type, "Other (< 1%)")) %>%
+  mutate(cell_type = ifelse(cell_type %in% sig_cell_types, cell_type, "Other (< 5%)")) %>%
   group_by(across(-proportion)) %>%
   summarise(proportion = sum(proportion), .groups = "drop")
 
-sig_names  <- sort(setdiff(unique(df_myo_plot$cell_type), "Other (< 1%)"))
+sig_names  <- sort(setdiff(unique(df_adipo_plot$cell_type), "Other (< 5%)"))
 color_vals <- c(setNames(unname(pals::alphabet(length(sig_names))), sig_names),
-                "Other (< 1%)" = "gray70")
+                "Other (< 5%)" = "gray70")
+color_vals["Unknown"] <- "white"
 
 sat_samples <- df_myo_plot %>% filter(group == "Sat")
 others <- df_myo_plot %>% filter(group != "Sat")
 
-p <- ggplot(others, aes(x = bio_replicate, y = proportion, fill = cell_type)) +
+p <- ggplot(others, aes(x = paste0(sample_id, "_", group), y = proportion, fill = cell_type)) +
   geom_col() +
   coord_flip() +
+  labs(x = "Sample", y = "Proportion") +
   facet_grid(day ~ method, scales = "free_y") +
   scale_fill_manual(values = color_vals, name = "Cell type") +
   theme_minimal() + 
