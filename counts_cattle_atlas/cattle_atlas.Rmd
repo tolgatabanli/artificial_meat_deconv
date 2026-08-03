@@ -8,9 +8,12 @@ date: "2026-05-19"
 library(Seurat)
 library(tidyverse)
 
+setwd("/nfs/home/students/t.tabanli/artifical_meat_deconv/counts_cattle_atlas")
+
 cattle <- readRDS("sampled_cattle_atlas.RDS")
 cattle$cell_type <- trimws(cattle$cell_type)
 cattle$cell_type <- gsub("'", "", cattle$cell_type) # Henle's loop causes issues in column parse
+cattle$cell_type <- gsub("/", "_", cattle$cell_type)
 dim(cattle)
 length(unique(cattle$cell_type))
 
