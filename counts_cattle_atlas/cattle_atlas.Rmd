@@ -45,9 +45,90 @@ table(paste0(cattle$cell_type)) %>%
 ggsave("distro_cell_types.png", width = 30, height = 10)
 ```
 
+Inconsistencies between cell type and label fields in the sampled atlas.
 
 ```{r}
-setwd("/nfs/home/students/t.tabanli/artifical_meat_deconv/counts_cattle_atlas")
+data.frame(ct = cattle$cell_type, l = cattle$label) %>%
+  distinct() %>% remove_rownames() %>%
+  filter(ct != l) %>%
+  write_csv("inconsistent_celltypes_and_labels.csv", col_names = T)
+```
+
+# Cell Ontology Remapping
+
+```{r, fig.width = 20}
+library(ontologyIndex)
+
+selected_ct_ids <- readLines("selected_classes.txt")
+mapping <- read_csv("celltype_to_CL_map.csv")
+onto <- get_OBO("cl-basic.obo")
+
+# returns: data.frame with columns:
+# - old_id | original cell ontology ID
+# - new_id | the cell ontology ID from the selected IDs that the old id maps to
+map_to_selected <- function(cell_onto_ids, ontology, selected_ids) {
+  # rows are the ancestors, cols are our annotation terms
+  desc_matrix <- get_term_descendancy_matrix(ontology, terms = cell_onto_ids, rows = selected_ids)
+  df_list <- lapply(colnames(desc_matrix), function(old_id) {
+    #cat(old_id, "\n")
+    new_id <- NULL
+    if (old_id %in% selected_ids) new_id <- old_id
+    else {
+      new_id <- rownames(desc_matrix)[which(desc_matrix[,old_id])] # multiple is possible
+    }
+    
+    # if the query term's ancestor not found in the selected terms, skip!
+    if (length(new_id) == 0) return()
+      
+    # if maps to multiple ancestors from the selected
+    # preserve the original id
+    if (length(new_id) > 1) new_id <- old_id
+    result <- data.frame(old_id = old_id, old_name = ontologyIndex::get_term_property(onto, "name", term = old_id),
+                         new_id = new_id, new_name = sapply(new_id, function(one_id) ontologyIndex::get_term_property(onto, "name", term = one_id), USE.NAMES = F))
+    return(result)
+  })
+  
+  return(bind_rows(df_list))
+}
+
+ct_to_coarse <- map_to_selected(cell_onto_ids = unique(ids_to_map),
+                                ontology = onto,
+                                selected_ids = selected_ct_ids)
+
+converter <- mapping %>% select(-notes) %>%
+  full_join(ct_to_coarse, by = join_by("cl_id" == "old_id")) %>%
+  mutate(new_name = case_when(original == "Unknown cells" ~ "Unknown cells",
+                              is.na(new_name) ~ "ignored",
+                              .default = new_name))
+
+cattle$coarse_type <- dplyr::recode_values(cattle$cell_type, from = converter$original, to = converter$new_name)
+
+umap_colors <- DiscretePalette(n_distinct(cattle$coarse_type))
+names(umap_colors) <- unique(cattle$coarse_type)
+umap_colors[is.na(names(umap_colors))] <- "beige"
+ignore_cells <- unique(converter$cl_name[converter$new_name == "ignored"])
+DimPlot(cattle, group.by = "coarse_type", cols = umap_colors) +
+  ggplot2::labs(caption = paste0("Cells ignored: ", paste0(na_cells, collapse=", "), "; n = ", sum(cattle$coarse_type == "ignored"),
+                                 "\nUnknown cells are propagated from the original annotation. Unknown cell types of the original meta data were replaced with the label field. The cell types are manually matched against cell ontology classes, and gathered in coarse classes given in the legend."))
+
+highlight <- c("cell of skeletal muscle", "connective tissue cell")
+table(paste0(cattle$coarse_type)) %>%
+  as.data.frame() %>%
+  mutate(highlighted = Var1 %in% highlight) %>%
+  ggplot(aes(x = Var1, y = Freq, fill = highlighted, color = highlighted)) + geom_col() +
+  scale_fill_manual(values = c("FALSE" = "white", "TRUE" = "lightblue")) +
+  scale_color_manual(values = c("FALSE" = "darkgray", "TRUE" = "lightblue")) +
+  scale_y_log10() +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0, size = 11),
+        panel.grid.major.x = element_blank(),
+        legend.position = "none")
+```
+
+
+
+```{r}
+source("~/artifical_meat_deconv/toolkit.R")
 
 comp_adipo_dwls <- readRDS("sig_dwls/adipo_compositions_cattleatlas_dwls_signature.Rds")
 comp_adipo_rectangle <- read_csv("rectangle_results/rectangle_estimations_adipo.csv") %>%
