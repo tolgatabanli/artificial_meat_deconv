@@ -4,7 +4,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=40
 #SBATCH --mem=380G
-#SBATCH --time=18:00:00
+#SBATCH --time=2-0:00:00
 #SBATCH --partition=exbio-cpu
 #SBATCH --output=job_%x_%j.out
 #SBATCH --error=job_%x_%j.err

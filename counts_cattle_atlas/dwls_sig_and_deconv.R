@@ -66,7 +66,7 @@ mat <- as.matrix(GetAssayData(cattle, assay = "RNA", layer = "counts"))
 
 message("Starting signature build...")
 omnideconv::build_model_dwls(single_cell_object = mat,
-                             cell_type_annotations = cattle$cell_type,
+                             cell_type_annotations = cattle$coarse_type,
                              dwls_method = "mast_optimized",
                              path = "sig_dwls",
                              verbose = T, ncores = 5) # TODO: defaults: diff_cutoff = 0.5, pval_cutoff = 0.01

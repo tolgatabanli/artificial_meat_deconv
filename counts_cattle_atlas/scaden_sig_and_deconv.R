@@ -30,7 +30,7 @@ bulk_matrix_myo <- bulk_matrix_myo[, gsub(".*_", "", colnames(bulk_matrix_myo)) 
 
 message("Starting training...")
 omnideconv::build_model_scaden(single_cell_object = mat,
-                               cell_type_annotations = cattle$cell_type,
+                               cell_type_annotations = cattle$coarse_type,
                                bulk_gene_expression = bulk_matrix_adipo,
                                model_path = "sig_scaden",
                                verbose = T)
