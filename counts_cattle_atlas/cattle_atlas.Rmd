@@ -135,14 +135,14 @@ table(paste0(cattle$coarse_type)) %>%
 source("~/artifical_meat_deconv/toolkit.R")
 
 comp_adipo_dwls <- readRDS("sig_dwls/adipo_compositions_cattleatlas_dwls_signature.Rds")
-comp_adipo_rectangle <- read_csv("rectangle_results/rectangle_estimations_adipo.csv") %>%
+comp_adipo_rectangle <- read_csv("sig_rectangle/rectangle_estimations_adipo.csv") %>%
   column_to_rownames("index") %>% as.matrix()
 comp_adipo_scaden <- readRDS("sig_scaden/adipo_compositions_cattleatlas_scaden.Rds")
 
 comp_myo_dwls <- readRDS("sig_dwls/myo_compositions_cattleatlas_dwls_signature.Rds")
 comp_myo_dwls <- comp_myo_dwls[rownames(comp_myo_dwls) != "", ]
 mode(comp_myo_dwls) <- "numeric"
-comp_myo_rectangle <- read_csv("rectangle_results/rectangle_estimations_myo.csv") %>%
+comp_myo_rectangle <- read_csv("sig_rectangle/rectangle_estimations_myo.csv") %>%
   column_to_rownames("index") %>% as.matrix()
 rownames(comp_myo_rectangle) <- gsub(".*_", "", rownames(comp_myo_rectangle))
 comp_myo_scaden <- readRDS("sig_scaden/myo_compositions_cattleatlas_scaden.Rds")
@@ -175,10 +175,11 @@ rownames(comp_myo_scaden) <- sxx_correct[gsub(".*_", "", rownames(comp_myo_scade
 
 ## Adipo compositions
 ```{r, fig.width=15}
-adipo_merged <- merge_methods(comp_adipo_dwls, comp_adipo_rectangle, comp_adipo_scaden, meta = bulk_meta_adipo, method_names = c("dwls", "rectangle", "scaden"))
+adipo_merged <- merge_methods(comp_adipo_dwls, comp_adipo_rectangle, comp_adipo_scaden,
+                              meta = bulk_meta_adipo, method_names = c("dwls", "rectangle", "scaden"))
 
 sig_cell_types <- adipo_merged %>%
-  filter(proportion > 0.05) %>%
+  filter(proportion > 0.0) %>%
   pull(cell_type) %>% unique()
 
 df_adipo_plot <- adipo_merged %>%
@@ -212,7 +213,7 @@ p
 myo_merged <- merge_methods(comp_myo_dwls, comp_myo_rectangle, comp_myo_scaden, meta = bulk_meta_myo, method_names = c("dwls", "rectangle", "scaden"))
 
 sig_cell_types <- myo_merged %>%
-  filter(proportion > 0.05) %>%
+  filter(proportion > 0.0) %>%
   pull(cell_type) %>% unique()
 
 df_myo_plot <- myo_merged %>%
