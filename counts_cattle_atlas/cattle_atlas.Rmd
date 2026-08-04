@@ -17,11 +17,11 @@ cattle$cell_type <- gsub("/", "_", cattle$cell_type)
 dim(cattle)
 length(unique(cattle$cell_type))
 
-cattle <- NormalizeData(cattle)
-cattle <- FindVariableFeatures(cattle)
-cattle <- ScaleData(cattle)
-cattle <- RunPCA(cattle)
-cattle <- RunUMAP(cattle, dims = 1:30)
+# cattle <- NormalizeData(cattle)
+# cattle <- FindVariableFeatures(cattle)
+# cattle <- ScaleData(cattle)
+# cattle <- RunPCA(cattle)
+# cattle <- RunUMAP(cattle, dims = 1:30)
 DimPlot(cattle, group.by = "cell_type")
 ```
 
@@ -60,7 +60,7 @@ data.frame(ct = cattle$cell_type, l = cattle$label) %>%
 library(ontologyIndex)
 
 selected_ct_ids <- readLines("selected_classes.txt")
-mapping <- read_csv("celltype_to_CL_map.csv")
+ct_to_cl <- read_csv("celltype_to_CL_map.csv")
 onto <- get_OBO("cl-basic.obo")
 
 # returns: data.frame with columns:
@@ -91,25 +91,29 @@ map_to_selected <- function(cell_onto_ids, ontology, selected_ids) {
   return(bind_rows(df_list))
 }
 
-ct_to_coarse <- map_to_selected(cell_onto_ids = unique(ids_to_map),
+ids_to_map <- ct_to_cl$cl_id[!is.na(ct_to_cl$cl_id)]
+cl_to_coarse <- map_to_selected(cell_onto_ids = ids_to_map,
                                 ontology = onto,
                                 selected_ids = selected_ct_ids)
 
-converter <- mapping %>% select(-notes) %>%
-  full_join(ct_to_coarse, by = join_by("cl_id" == "old_id")) %>%
+converter <- ct_to_cl %>% select(-notes) %>%
+  full_join(cl_to_coarse, by = join_by("cl_id" == "old_id")) %>%
   mutate(new_name = case_when(original == "Unknown cells" ~ "Unknown cells",
                               is.na(new_name) ~ "ignored",
                               .default = new_name))
 
 cattle$coarse_type <- dplyr::recode_values(cattle$cell_type, from = converter$original, to = converter$new_name)
+saveRDS(cattle, file = "sampled_cattle_atlas.RDS")
+write.csv(cattle@meta.data, "sampled_cattle_atlas/metadata.csv")
+
 
 umap_colors <- DiscretePalette(n_distinct(cattle$coarse_type))
 names(umap_colors) <- unique(cattle$coarse_type)
 umap_colors[is.na(names(umap_colors))] <- "beige"
 ignore_cells <- unique(converter$cl_name[converter$new_name == "ignored"])
 DimPlot(cattle, group.by = "coarse_type", cols = umap_colors) +
-  ggplot2::labs(caption = paste0("Cells ignored: ", paste0(na_cells, collapse=", "), "; n = ", sum(cattle$coarse_type == "ignored"),
-                                 "\nUnknown cells are propagated from the original annotation. Unknown cell types of the original meta data were replaced with the label field. The cell types are manually matched against cell ontology classes, and gathered in coarse classes given in the legend."))
+  ggplot2::labs(caption = paste0("Cells ignored: ", paste0(ignore_cells, collapse=", "), "; n = ", sum(cattle$coarse_type == "ignored"),
+                                 "\nUnknown cells are propagated from the original annotation. Unknown cell types of the original meta data were replaced with the label field.\nThe cell types are manually matched against cell ontology classes, and gathered in coarse classes seen in the legend."))
 
 highlight <- c("cell of skeletal muscle", "connective tissue cell")
 table(paste0(cattle$coarse_type)) %>%
