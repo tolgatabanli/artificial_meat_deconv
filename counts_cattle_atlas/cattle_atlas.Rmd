@@ -45,15 +45,6 @@ table(paste0(cattle$cell_type)) %>%
 ggsave("distro_cell_types.png", width = 30, height = 10)
 ```
 
-Inconsistencies between cell type and label fields in the sampled atlas.
-
-```{r}
-data.frame(ct = cattle$cell_type, l = cattle$label) %>%
-  distinct() %>% remove_rownames() %>%
-  filter(ct != l) %>%
-  write_csv("inconsistent_celltypes_and_labels.csv", col_names = T)
-```
-
 # Cell Ontology Remapping
 
 ```{r, fig.width = 20}
