@@ -87,7 +87,8 @@ cl_to_coarse <- map_to_selected(cell_onto_ids = ids_to_map,
                                 ontology = onto,
                                 selected_ids = selected_ct_ids)
 
-converter <- ct_to_cl %>% select(-notes) %>%
+converter <- ct_to_cl %>%
+  dplyr::select(-notes) %>%
   full_join(cl_to_coarse, by = join_by("cl_id" == "old_id")) %>%
   mutate(new_name = case_when(original == "Unknown cells" ~ "Unknown cells",
                               is.na(new_name) ~ "ignored",
@@ -106,11 +107,12 @@ DimPlot(cattle, group.by = "coarse_type", cols = umap_colors) +
   ggplot2::labs(caption = paste0("Cells ignored: ", paste0(ignore_cells, collapse=", "), "; n = ", sum(cattle$coarse_type == "ignored"),
                                  "\nUnknown cells are propagated from the original annotation. Unknown cell types of the original meta data were replaced with the label field.\nThe cell types are manually matched against cell ontology classes, and gathered in coarse classes seen in the legend."))
 
-highlight <- c("cell of skeletal muscle", "connective tissue cell")
+highlight <- c("cell of skeletal muscle", "stromal cell")
 table(paste0(cattle$coarse_type)) %>%
   as.data.frame() %>%
   mutate(highlighted = Var1 %in% highlight) %>%
   ggplot(aes(x = Var1, y = Freq, fill = highlighted, color = highlighted)) + geom_col() +
+  geom_text(aes(label = Freq), position = position_stack(vjust = 0.5), color = "black", angle = 90) +
   scale_fill_manual(values = c("FALSE" = "white", "TRUE" = "lightblue")) +
   scale_color_manual(values = c("FALSE" = "darkgray", "TRUE" = "lightblue")) +
   scale_y_log10() +
