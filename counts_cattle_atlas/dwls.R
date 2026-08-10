@@ -11,6 +11,8 @@ cattle <- readRDS("sampled_cattle_atlas.RDS")
 cattle$cell_type <- trimws(cattle$cell_type)
 cattle$cell_type <- gsub("'", "", cattle$cell_type) # Henle's loop causes issues in column parse
 cattle$cell_type <- gsub("/", "_", cattle$cell_type)
+# cattle$coarse_type is already in correct format
+# cattle$cell_lineage also
 dim(cattle)
 
 ### patch
@@ -24,7 +26,7 @@ patched_DEAnalysisMASTOptimized <- function(scdata, id, path, verbose = FALSE) {
   for (i in uniqueIds) {
     mist_file <- paste0(path, "/", i, "_mist.RData")
     if (file.exists(mist_file)) {
-      message("Skipping ", i, " — MIST file exists")
+      message("Skipping ", i, " (MIST file exists)")
       load(mist_file)
       index <- which(uniqueIds == i)
       list_lrTest.table[[index]] <- cluster_lrTest.table
@@ -66,14 +68,14 @@ mat <- as.matrix(GetAssayData(cattle, assay = "RNA", layer = "counts"))
 
 message("Starting signature build...")
 omnideconv::build_model_dwls(single_cell_object = mat,
-                             cell_type_annotations = cattle$coarse_type,
+                             cell_type_annotations = cattle$cell_lineage,
                              dwls_method = "mast_optimized",
-                             path = "sig_dwls",
+                             path = "sig_dwls_lineage",
                              verbose = T, ncores = 5) # TODO: defaults: diff_cutoff = 0.5, pval_cutoff = 0.01
 message("Signature building finished")
 
 
-load("sig_dwls/Sig.RData")
+load("sig_dwls_lineage/Sig.RData")
 
 
 message("Reading tpms...")
@@ -117,5 +119,5 @@ message("___myo___")
 comp_myo   <- deconvolute_dwls_parallel(bulk_matrix_myo,   Sig, ncores = 26)
 
 
-saveRDS(comp_adipo, "sig_dwls/adipo_compositions_cattleatlas_dwls_signature.Rds")
-saveRDS(comp_myo, "sig_dwls/myo_compositions_cattleatlas_dwls_signature.Rds")
+saveRDS(comp_adipo, "sig_dwls_lineage/adipo_compositions_cattleatlas_dwls_signature.Rds")
+saveRDS(comp_myo, "sig_dwls_lineage/myo_compositions_cattleatlas_dwls_signature.Rds")
