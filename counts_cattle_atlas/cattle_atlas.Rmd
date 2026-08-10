@@ -4,7 +4,7 @@ output: html_document
 date: "2026-05-19"
 ---
 
-```{r, fig.width = 40}
+```{r, fig.width = 10}
 library(Seurat)
 library(tidyverse)
 
@@ -17,12 +17,12 @@ cattle$cell_type <- gsub("/", "_", cattle$cell_type)
 dim(cattle)
 length(unique(cattle$cell_type))
 
-# cattle <- NormalizeData(cattle)
-# cattle <- FindVariableFeatures(cattle)
-# cattle <- ScaleData(cattle)
-# cattle <- RunPCA(cattle)
-# cattle <- RunUMAP(cattle, dims = 1:30)
-DimPlot(cattle, group.by = "cell_type")
+cattle <- NormalizeData(cattle)
+cattle <- FindVariableFeatures(cattle)
+cattle <- ScaleData(cattle)
+cattle <- RunPCA(cattle)
+cattle <- RunUMAP(cattle, dims = 1:30)
+DimPlot(cattle, group.by = "cell_lineage")
 ```
 
 ```{r, fig.width = 30, fig.height = 10}
@@ -129,23 +129,35 @@ table(paste0(cattle$coarse_type)) %>%
         legend.position = "none")
 ```
 
+# Using Cell Lineages from the Publication
+
+```{r}
+table(paste0(cattle$cell_lineage)) %>%
+  as.data.frame() %>%
+  ggplot(aes(x = Var1, y = Freq)) + geom_col(fill = "lightgray") +
+  geom_text(aes(label = Freq), position = position_stack(vjust = 0.5), color = "black", angle = 90) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0, size = 11),
+        panel.grid.major.x = element_blank(),
+        legend.position = "none")
+```
 
 
 ```{r}
 source("~/artifical_meat_deconv/toolkit.R")
 
-comp_adipo_dwls <- readRDS("sig_dwls/adipo_compositions_cattleatlas_dwls_signature.Rds")
-comp_adipo_rectangle <- read_csv("sig_rectangle/rectangle_estimations_adipo.csv") %>%
+comp_adipo_dwls <- readRDS("sig_dwls_lineage/adipo_compositions_cattleatlas_dwls_signature.Rds")
+comp_adipo_rectangle <- read_csv("sig_rectangle_lineage/rectangle_estimations_adipo.csv") %>%
   column_to_rownames("index") %>% as.matrix()
-comp_adipo_scaden <- readRDS("sig_scaden/adipo_compositions_cattleatlas_scaden.Rds")
+comp_adipo_scaden <- readRDS("sig_scaden_lineage/adipo_compositions_cattleatlas_scaden.Rds")
 
-comp_myo_dwls <- readRDS("sig_dwls/myo_compositions_cattleatlas_dwls_signature.Rds")
+comp_myo_dwls <- readRDS("sig_dwls_lineage/myo_compositions_cattleatlas_dwls_signature.Rds")
 comp_myo_dwls <- comp_myo_dwls[rownames(comp_myo_dwls) != "", ]
 mode(comp_myo_dwls) <- "numeric"
-comp_myo_rectangle <- read_csv("sig_rectangle/rectangle_estimations_myo.csv") %>%
+comp_myo_rectangle <- read_csv("sig_rectangle_lineage/rectangle_estimations_myo.csv") %>%
   column_to_rownames("index") %>% as.matrix()
 rownames(comp_myo_rectangle) <- gsub(".*_", "", rownames(comp_myo_rectangle))
-comp_myo_scaden <- readRDS("sig_scaden/myo_compositions_cattleatlas_scaden.Rds")
+comp_myo_scaden <- readRDS("sig_scaden_lineage/myo_compositions_cattleatlas_scaden.Rds")
 ```
 
 ```{r}
