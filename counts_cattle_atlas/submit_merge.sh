@@ -3,7 +3,7 @@
 #SBATCH --job-name=cattle_merge
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=20
-#SBATCH --mem=300G
+#SBATCH --mem=260G
 #SBATCH --time=0:45:00
 #SBATCH --partition=exbio-cpu
 #SBATCH --output=job_%x_%j.out
