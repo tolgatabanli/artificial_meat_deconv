@@ -16,5 +16,5 @@ source /opt/mambaforge/etc/profile.d/conda.sh
 conda activate r421
 export R_LIBS_USER=/nfs/home/students/t.tabanli/.conda/envs/r421/lib/R/library
 Rscript --version
-Rscript scaden_sig_and_deconv.R
+Rscript scaden.R
 

@@ -12,4 +12,4 @@
 #SBATCH --mail-user=tolgatabanli@gmail.com
 
 Rscript --version
-Rscript dwls_sig_and_deconv.R
+Rscript dwls.R
