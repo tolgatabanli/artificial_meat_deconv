@@ -51,6 +51,8 @@ ggsave("distro_cell_types.png", width = 30, height = 10)
 
 # Cell Ontology Remapping
 
+For the cattle atlas:
+
 ```{r, fig.width = 20}
 library(ontologyIndex)
 
@@ -95,7 +97,7 @@ converter <- ct_to_cl %>%
   dplyr::select(-notes) %>%
   full_join(cl_to_coarse, by = join_by("cl_id" == "old_id")) %>%
   mutate(new_name = case_when(original == "Unknown cells" ~ "Unknown cells",
-                              is.na(new_name) ~ "ignored",
+                              is.na(new_name) ~ cl_name,
                               .default = new_name))
 
 cattle$coarse_type <- dplyr::recode_values(cattle$cell_type, from = converter$original, to = converter$new_name)
@@ -125,6 +127,7 @@ table(paste0(cattle$coarse_type)) %>%
         panel.grid.major.x = element_blank(),
         legend.position = "none")
 ```
+
 
 # Using Cell Lineages from the Publication
 
