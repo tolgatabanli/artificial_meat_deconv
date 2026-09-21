@@ -11,15 +11,15 @@ celltype_to_lineage <- read_csv("cell_type_lineage_map.csv")
 # matrix of tissue x cell_type -> how many cells from each type per tissue
 # results <- mclapply(rds_files, function(f) {
 #   obj <- readRDS(f)
-#   
+# 
 #   # assign label if cell_type unknown
 #   #obj$cell_type <- ifelse(obj$cell_type == "Unknown cells", obj$label, obj$cell_type)
 #   ct_table <- table(obj$cell_type)
 #   #ct_table <- ct_table[!names(ct_table) %in% "Unknown cells"]
-#   
+# 
 #   ct_occurrences <- as.vector(ct_table)
 #   names(ct_occurrences) <- names(ct_table)
-#   
+# 
 #   tissue_to_add <- as.data.frame(as.list(ct_occurrences), check.names = FALSE)
 #   if (length(unique(obj$tissue)) > 1) {
 #     warning("Multiple tissues detected. Using the file name instead: ", f)
