@@ -22,7 +22,11 @@ cattle <- FindVariableFeatures(cattle)
 cattle <- ScaleData(cattle)
 cattle <- RunPCA(cattle)
 cattle <- RunUMAP(cattle, dims = 1:30)
-DimPlot(cattle, group.by = "cell_lineage")
+DimPlot(cattle, group.by = "cell_lineage", pt.size = 0.1) +
+  scale_color_manual(values = unname(pals::alphabet(n_distinct(cattle$cell_lineage))),
+                     name = "Cell lineage") +
+  labs(title = "Cattle Atlas", x = "UMAP 1", y = "UMAP 2")
+ggsave("figures/cattleatlas_umap_cell_lineage.png", width = 9)
 ```
 
 ```{r, fig.width = 30, fig.height = 10}
