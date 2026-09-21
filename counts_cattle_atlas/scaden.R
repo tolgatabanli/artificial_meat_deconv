@@ -30,23 +30,23 @@ bulk_matrix_myo <- bulk_matrix_myo[, gsub(".*_", "", colnames(bulk_matrix_myo)) 
 
 message("Starting training...")
 omnideconv::build_model_scaden(single_cell_object = mat,
-                               cell_type_annotations = cattle$cell_lineage,
+                               cell_type_annotations = cattle$cell_type,
                                bulk_gene_expression = bulk_matrix_adipo,
-                               model_path = "sig_scaden_lineage",
+                               model_path = "sig_scaden_fine",
                                verbose = T)
 
 message("Signature building finished")
 
 
-comp_adipo <- omnideconv::deconvolute_scaden(signature = "sig_scaden_lineage",
+comp_adipo <- omnideconv::deconvolute_scaden(signature = "sig_scaden_fine",
                                              bulk_gene_expression = bulk_matrix_adipo,
                                              verbose = T)
-comp_myo <- omnideconv::deconvolute_scaden(signature = "sig_scaden_lineage",
+comp_myo <- omnideconv::deconvolute_scaden(signature = "sig_scaden_fine",
                                            bulk_gene_expression = bulk_matrix_myo,
                                            verbose = T)
 
-saveRDS(comp_adipo, "sig_scaden_lineage/adipo_compositions_cattleatlas_scaden.Rds")
-saveRDS(comp_myo, "sig_scaden_lineage/myo_compositions_cattleatlas_scaden.Rds")
+saveRDS(comp_adipo, "sig_scaden_fine/adipo_compositions_cattleatlas_scaden.Rds")
+saveRDS(comp_myo, "sig_scaden_fine/myo_compositions_cattleatlas_scaden.Rds")
 
 message("Deconvolution finished")
 
