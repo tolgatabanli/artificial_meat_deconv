@@ -3,23 +3,38 @@
 ```{r}
 library(Seurat)
 library(sctransform)
+library(tidyverse)
 ```
 
 ```{r}
-counts <- data.table::fread('/nfs/data2/huji_artificial_meat/deconvolution_data/external_sc_references/messmer2023_GSE211428/GSE211428_combined_counts.tsv.gz')
-# index is in the first col (V1)
-genes <- counts[[1]]
+counts <- data.table::fread('/nfs/data2/huji_artificial_meat/deconvolution_data/external_sc_references/messmer2023_GSE211428/GSE211428_counts.tsv.gz')
 mat <- as.matrix(counts[, -1])
-rownames(mat) <- genes
+rownames(mat) <- counts$V1
 
 col_meta <- data.table::fread('/nfs/data2/huji_artificial_meat/deconvolution_data/external_sc_references/messmer2023_GSE211428/GSE211428_combined_meta.tsv.gz')
+col_meta <- as.data.frame(col_meta)
+rownames(col_meta) <- gsub("^(.*)\\.([0-9]+)_([0-9]+)$", "Inj\\3_\\1-\\2", col_meta$Unique_barcode)
+col_meta$V1 <- NULL
 
+# make the names path-compatible, since DWLS creates dirs
+col_meta$predicted.pheno <- gsub("/", "-", col_meta$predicted.pheno)
 gc()
-messner2023 <- CreateSeuratObject(counts = mat, meta.data = col_meta)
+
+cat("colnames(mat):", length(colnames(mat)), "\n")
+cat("col_meta barcodes:", nrow(col_meta), "\n")
+cat("Intersection:", length(intersect(colnames(mat), rownames(col_meta))), "\n")
+cat("In mat not in col_meta:", length(setdiff(colnames(mat), rownames(col_meta))), "\n")
+cat("In col_meta not in mat:", length(setdiff(rownames(col_meta), colnames(mat))), "\n")
+
+common <- intersect(colnames(mat), rownames(col_meta))
+mat <- mat[, common]
+col_meta <- col_meta[common, ]
+
+messmer2023 <- CreateSeuratObject(counts = mat, meta.data = col_meta)
 ```
 
 ```{r}
-unique(messner2023$predicted.pheno)
+unique(messmer2023$predicted.pheno)
 ```
 
 
