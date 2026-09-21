@@ -54,9 +54,23 @@ seurat_obj <- RunPCA(seurat_obj, verbose = FALSE)
 
 set.seed(2023)
 seurat_obj <- RunUMAP(seurat_obj, dims = 1:30, verbose = T, n.neighbors = 50, min.dist = 0.1)
-seurat_obj$predicted.pheno <- recode(seurat_obj$predicted.pheno, "Monocytes - M?" = "Monocytes - MΦ")
+seurat_obj$predicted.pheno <- recode(seurat_obj$predicted.pheno, "Monocytes - M?" = "Monocytes / MΦ")
+DimPlot(seurat_obj, label = F, group.by = "predicted.pheno", pt.size = 0.1) +
+  scale_color_manual(values = unname(pals::alphabet(n_distinct(seurat_obj$predicted.pheno))),
+                     name = "Cell type") +
+  labs(title = "Messmer2023", x = "UMAP 1", y = "UMAP 2")
+ggsave(filename = "~/artifical_meat_deconv/messmer_counts/Figures/messmer2023_regenerated_umap.png",
+       width = 9, height = 6)
 
-DimPlot(seurat_obj, label = T, group.by = "predicted.pheno", repel = T, pt.size = 0.1)
-ggsave(filename = "~/artifical_meat_deconv/reproduced_timepoint1.png", width = 9, height = 6)
+# with ellipses around injections
+umap_df <- Embeddings(seurat_obj, "umap") %>% as.data.frame()
+umap_df$orig.ident <- seurat_obj$orig.ident
+
+DimPlot(seurat_obj, label = T, group.by = "predicted.pheno", repel = T, pt.size = 0.1) +
+  scale_color_manual(values = unname(pals::alphabet(15)),
+                      name = "Cell type") +
+  labs(title = "Messmer2023", x = "UMAP 1", y = "UMAP 2") +
+  stat_ellipse(data = umap_df, aes(x = umap_1, y = umap_2, group = orig.ident, color = orig.ident),
+               inherit.aes = FALSE, linewidth = 0.5)
 ```
 
