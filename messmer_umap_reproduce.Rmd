@@ -51,8 +51,6 @@ seurat_obj <- SCTransform(
 )
 
 seurat_obj <- RunPCA(seurat_obj, verbose = FALSE)
-#seurat_obj <- FindNeighbors(seurat_obj, dims = 1:50)
-#seurat_obj <- FindClusters(seurat_obj, resolution=0.1)
 
 set.seed(2023)
 seurat_obj <- RunUMAP(seurat_obj, dims = 1:30, verbose = T, n.neighbors = 50, min.dist = 0.1)
