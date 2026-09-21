@@ -146,18 +146,18 @@ table(paste0(cattle$cell_lineage)) %>%
 ```{r}
 source("~/artifical_meat_deconv/toolkit.R")
 
-comp_adipo_dwls <- readRDS("sig_dwls_lineage/adipo_compositions_cattleatlas_dwls_signature.Rds")
-comp_adipo_rectangle <- read_csv("sig_rectangle_lineage/rectangle_estimations_adipo.csv") %>%
+comp_adipo_dwls <- readRDS("sig_dwls_fine/adipo_compositions_cattleatlas_dwls_signature.Rds")
+comp_adipo_rectangle <- read_csv("sig_rectangle_fine/rectangle_estimations_adipo.csv") %>%
   column_to_rownames("index") %>% as.matrix()
-comp_adipo_scaden <- readRDS("sig_scaden_lineage/adipo_compositions_cattleatlas_scaden.Rds")
+comp_adipo_scaden <- readRDS("sig_scaden_fine/adipo_compositions_cattleatlas_scaden.Rds")
 
-comp_myo_dwls <- readRDS("sig_dwls_lineage/myo_compositions_cattleatlas_dwls_signature.Rds")
+comp_myo_dwls <- readRDS("sig_dwls_fine/myo_compositions_cattleatlas_dwls_signature.Rds")
 comp_myo_dwls <- comp_myo_dwls[rownames(comp_myo_dwls) != "", ]
 mode(comp_myo_dwls) <- "numeric"
-comp_myo_rectangle <- read_csv("sig_rectangle_lineage/rectangle_estimations_myo.csv") %>%
+comp_myo_rectangle <- read_csv("sig_rectangle_fine/rectangle_estimations_myo.csv") %>%
   column_to_rownames("index") %>% as.matrix()
 rownames(comp_myo_rectangle) <- gsub(".*_", "", rownames(comp_myo_rectangle))
-comp_myo_scaden <- readRDS("sig_scaden_lineage/myo_compositions_cattleatlas_scaden.Rds")
+comp_myo_scaden <- readRDS("sig_scaden_fine/myo_compositions_cattleatlas_scaden.Rds")
 ```
 
 ```{r}
@@ -185,13 +185,50 @@ bulk_meta_myo$sample_id <- sxx_correct[gsub(".*_", "", bulk_meta_myo$sample_id)]
 rownames(comp_myo_scaden) <- sxx_correct[gsub(".*_", "", rownames(comp_myo_scaden))]
 ```
 
+Aggregating cell types in deconvolution results to cell ontology.
+
+```{r}
+rename_cols <- function(cols, converter) {
+  idx <- base::match(cols, converter$original)
+  ifelse(is.na(idx), cols, converter$new_name[idx])
+}
+# 
+# colnames(comp_adipo_dwls) <- rename_cols(colnames(comp_adipo_dwls), converter)
+# colnames(comp_adipo_rectangle) <- rename_cols(colnames(comp_adipo_rectangle), converter)
+# colnames(comp_adipo_scaden) <- rename_cols(colnames(comp_adipo_scaden), converter)
+# colnames(comp_myo_dwls) <- rename_cols(colnames(comp_myo_dwls), converter)
+# colnames(comp_myo_rectangle) <- rename_cols(colnames(comp_myo_rectangle), converter)
+# colnames(comp_myo_scaden) <- rename_cols(colnames(comp_myo_scaden), converter)
+
+# with lineage:
+converter_lineage <- unique(data.frame(
+  original = cattle$cell_type,
+  new_name = cattle$cell_lineage
+))
+
+colnames(comp_adipo_dwls) <- rename_cols(colnames(comp_adipo_dwls), converter_lineage)
+colnames(comp_adipo_rectangle) <- rename_cols(colnames(comp_adipo_rectangle), converter_lineage)
+colnames(comp_adipo_scaden) <- rename_cols(colnames(comp_adipo_scaden), converter_lineage)
+colnames(comp_myo_dwls) <- rename_cols(colnames(comp_myo_dwls), converter_lineage)
+colnames(comp_myo_rectangle) <- rename_cols(colnames(comp_myo_rectangle), converter_lineage)
+colnames(comp_myo_scaden) <- rename_cols(colnames(comp_myo_scaden), converter_lineage)
+
+comp_adipo_dwls <- t(rowsum(t(comp_adipo_dwls), group = colnames(comp_adipo_dwls)))
+comp_adipo_rectangle <- t(rowsum(t(comp_adipo_rectangle), group = colnames(comp_adipo_rectangle)))
+comp_adipo_scaden <- t(rowsum(t(comp_adipo_scaden), group = colnames(comp_adipo_scaden)))
+comp_myo_dwls <- t(rowsum(t(comp_myo_dwls), group = colnames(comp_myo_dwls)))
+comp_myo_rectangle <- t(rowsum(t(comp_myo_rectangle), group = colnames(comp_myo_rectangle)))
+comp_myo_scaden <- t(rowsum(t(comp_myo_scaden), group = colnames(comp_myo_scaden)))
+
+```
+
 ## Adipo compositions
 ```{r, fig.width=15}
 adipo_merged <- merge_methods(comp_adipo_dwls, comp_adipo_rectangle, comp_adipo_scaden,
                               meta = bulk_meta_adipo, method_names = c("dwls", "rectangle", "scaden"))
 
 sig_cell_types <- adipo_merged %>%
-  filter(proportion > 0.0) %>%
+  filter(proportion > 0) %>%
   pull(cell_type) %>% unique()
 
 df_adipo_plot <- adipo_merged %>%
