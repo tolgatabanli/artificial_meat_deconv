@@ -221,20 +221,17 @@ we currently see gaps on both sides: unannotated samples in the count matrix
 and samples in the samplesheet that do not come up in the count matrix.
 
 ```{r read-meta}
-bulk_meta_adipo <- read_csv('/nfs/data2/huji_artificial_meat/adipogenesis/sample_sheet_cleaned.csv', col_names = T) %>%
-  janitor::clean_names()
-bulk_meta_myo <- read_csv('/nfs/data2/huji_artificial_meat/myogenesis/sample_sheet_cleaned.csv', col_names = T) %>%
-  janitor::clean_names()
+bulk_matrix_adipo <- read_tpm("/nfs/data2/huji_artificial_meat/adipogenesis/adipogenesis_tpm.tsv")
+bulk_meta_adipo <- read.csv("/nfs/data2/huji_artificial_meat/adipogenesis/sample_sheet_cleaned.csv", header = T)
+bulk_matrix_adipo <- bulk_matrix_adipo[, bulk_meta_adipo$sample_id]
 
-bulk_meta_adipo <- bulk_meta_adipo %>%
-  select(library_name, sample_id, title, group, bio_replicate, individual, treatment, day) %>%
-  mutate(day = factor(day, levels = c("D0", "D2", "D3", "D6", "D14")))
-bulk_meta_myo <- bulk_meta_myo %>%
-  select(library_name, sample_id, group, day, bio_replicate, treatment) %>%
-  mutate(sample_id = gsub(".*_", "", sample_id)) %>%
-  mutate(day = factor(day, levels = c("d0", "d3", "d7", "d21")),
-         group = gsub("(?!Sat)D\\d*", "\\", group, perl = T)) %>%
-  separate_wider_delim(cols = group, delim = "_", names = c(NA, "group"), too_few = "align_end")
+bulk_matrix_myo <- read_tpm("/nfs/data2/huji_artificial_meat/myogenesis/nfcore_out/star_salmon/salmon.merged.gene_tpm.tsv")
+colnames(bulk_matrix_myo) <- gsub(".*_", "", colnames(bulk_matrix_myo))
+bulk_meta_myo <- read.csv("/nfs/data2/huji_artificial_meat/myogenesis/sample_sheet_minimal.csv", header = T)
+bulk_matrix_myo <- bulk_matrix_myo[, gsub(".*_", "", colnames(bulk_matrix_myo)) %in% gsub(".*_", "", bulk_meta_myo$sample_id)]
+
+length(intersect(rownames(Sig), rownames(bulk_matrix_adipo)))
+length(intersect(rownames(Sig), rownames(bulk_matrix_myo)))
 ```
 
 Once more, a visual representation of sample mapping issue using Venn diagrams:
