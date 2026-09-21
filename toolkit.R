@@ -30,7 +30,7 @@ merge_methods <- function(..., meta, method_names = NULL) {
     df <- data.frame(sample_id = rownames(mat), mat, method = name, check.names = FALSE)
     missing_cols <- setdiff(cell_types, colnames(mat))
     df[, missing_cols] <- 0
-    df
+    df[, c("sample_id", "method", cell_types)]
   }, mats, method_names, SIMPLIFY = FALSE)
   
   do.call(rbind, mats_df) %>%
