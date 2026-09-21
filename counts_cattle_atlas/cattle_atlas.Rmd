@@ -167,11 +167,11 @@ bulk_meta_myo <- read_csv('/nfs/data2/huji_artificial_meat/myogenesis/sample_she
   janitor::clean_names()
 
 bulk_meta_adipo <- bulk_meta_adipo %>%
-  select(library_name, sample_id, title, group, bio_replicate, individual, treatment, day) %>%
+  dplyr::select(library_name, sample_id, title, group, bio_replicate, individual, treatment, day) %>%
   mutate(day = recode(day, "D3" = "D2")) %>%
   mutate(day = factor(day, levels = c("D0", "D2", "D3", "D6", "D14")))
 bulk_meta_myo <- bulk_meta_myo %>%
-  select(library_name, sample_id, group, day, bio_replicate, treatment) %>%
+  dplyr::select(library_name, sample_id, group, day, bio_replicate, treatment) %>%
   mutate(sample_id = gsub(".*_", "", sample_id)) %>%
   mutate(day = factor(day, levels = c("d0", "d3", "d7", "d21")),
          group = gsub("(?!Sat)D\\d*", "\\", group, perl = T)) %>%
