@@ -2,7 +2,7 @@ library(compositions)
 library(vegan)
 library(ggrepel)
 library(tidyverse)
-setwd("~/artifical_meat_deconv")
+setwd("~/artifical_meat_deconv/")
 source("toolkit.R")
 
 # Compare DWLS and Rectangle compositions of myogenesis
