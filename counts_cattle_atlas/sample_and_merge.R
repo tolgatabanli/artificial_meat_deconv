@@ -27,26 +27,43 @@ celltype_to_lineage <- read_csv("cell_type_lineage_map.csv")
 #   } else {
 #     rownames(tissue_to_add) <- unique(obj$tissue)
 #   }
-#   
+# 
 #   tissue_to_add
 # }, mc.cores = 20)
 # 
 # tissue_by_ct <- as.matrix(dplyr::bind_rows(results))
 # tissue_by_ct[is.na(tissue_by_ct)] <- 0
-# # Normalize by column sums -> find how much each tissue contributes to each cell type
-# tissue_contributions <- prop.table(tissue_by_ct, margin = 2)
 # 
 # readr::write_csv(tibble::rownames_to_column(as.data.frame(tissue_by_ct), "tissue"), file = "tissue_by_ct.csv", col_names = T)
-# readr::write_csv(tibble::rownames_to_column(as.data.frame(tissue_contributions), "tissue"), file = "tissue_contributions.csv", col_names = T)
 
 tissue_by_ct <- readr::read_csv("tissue_by_ct.csv", col_names = T) %>%
   column_to_rownames("tissue")
-tissue_contributions <- readr::read_csv("tissue_contributions.csv", col_names = T) %>%
-  column_to_rownames("tissue")
 
-cat("Total number: ", sum(colSums(tissue_by_ct)), "\n")
-# scale down by a factor of 30
-sampling_matrix <- ceiling(tissue_by_ct / 30)
+
+tissue_by_ct <- tissue_by_ct[, colSums(tissue_by_ct) >= 500]
+
+# Normalize by column sums -> find how much each tissue contributes to each cell type
+tissue_contributions <- prop.table(as.matrix(tissue_by_ct), margin = 2)
+
+largest_remainder_round <- function(x, total) {
+  # x: a vector of floating point numbers to round, sum will equal to 'total',
+  floor_x   <- floor(x)
+  remainder <- x - floor_x
+  deficit   <- total - sum(floor_x)     # how many units still need distributing
+  
+  if (deficit > 0) {
+    give_to <- order(remainder, decreasing = TRUE)[seq_len(deficit)]
+    floor_x[give_to] <- floor_x[give_to] + 1
+  }
+  floor_x
+}
+
+target <- tissue_contributions * 500
+sampling_matrix <- apply(target, 2, largest_remainder_round, total = 500)
+rownames(sampling_matrix) <- rownames(tissue_by_ct)
+colSums(sampling_matrix)
+
+cat("Total number: ", sum(colSums(sampling_matrix)), "\n")
 
 
 # sampling_matrix is a tissue x cell_type matrix, specifying
