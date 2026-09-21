@@ -27,7 +27,7 @@ the features TSV of the individual injections contain the original IDs in the
 same order, these Ensembl IDs from the features.tsv.gz will be used.
 
 ```{r read-counts}
-counts <- data.table::fread('/nfs/home/students/t.tabanli/artifical_meat_deconv/messmer_counts/GSE211428_counts.tsv.gz')
+counts <- data.table::fread('/nfs/data2/huji_artificial_meat/deconvolution_data/external_sc_references/messmer2023_GSE211428/GSE211428_counts.tsv.gz')
 mat <- as.matrix(counts[, -1])
 rownames(mat) <- counts$V1
 
@@ -69,7 +69,7 @@ table(paste0(col_meta$orig.ident, "_", col_meta$predicted.pheno)) %>%
   labs(x = "", y = "Count") +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, hjust=1, size = 11), panel.grid.major.x = element_blank())
-ggsave("~/artifical_meat_deconv/images/distro_cell_types.png", width = 8, height = 5)
+ggsave("Figures/messmer2023_distro_cell_types.png", width = 8, height = 5)
 ```
 
 They are not equally represented. FAPs, SCs, and VECs tend to occur much more
@@ -92,7 +92,7 @@ Tenocytes constitute a very small portion of the data set and they could skew th
 omnideconv::build_model_dwls(single_cell_object = mat,
                         cell_type_annotations = col_meta$predicted.pheno,
                         dwls_method = "mast_optimized",
-                        path = "tolga_combined_signatures/messmer_dwls_signature",
+                        path = "sig_dwls",
                         verbose = T, ncores = 6) # TODO: defaults: diff_cutoff = 0.5, pval_cutoff = 0.01
 
 # without tenocytes
@@ -100,7 +100,7 @@ noTenocyte_index <- col_meta$predicted.pheno != "Tenocytes"
 omnideconv::build_model_dwls(single_cell_object = mat[, noTenocyte_index],
                         cell_type_annotations = col_meta$predicted.pheno[noTenocyte_index],
                         dwls_method = "mast_optimized",
-                        path = "tolga_combined_signatures/messmer_dwls_signature_noTenocyte",
+                        path = "sig_dwls_noTeno",
                         verbose = T, ncores = 10)
 ```
 
@@ -116,7 +116,7 @@ how well they correlate.
 # for the markdown, this block is skipped and
 # the signature without tenocytes is used
 
-load('sig_dwls_messmer_recreated_counts/Sig.RData')
+load('sig_dwls/Sig.RData')
 
 fap_teno <- Sig %>% as.data.frame()
 fap_teno <- fap_teno %>%
@@ -143,12 +143,12 @@ fap_teno %>%
   scale_y_log10() +
   stat_cor(method = "pearson", label.x.npc = "left", label.y.npc = "top",
            aes(label = paste(..r.label.., ..rr.label.., sep = "~`,`~")))
+ggsave("Figures/messmer2023_corr_commongenes_tenocytes_vs_faps.png")
 
 ```
 
 ```{r signature-load, echo=FALSE}
-load('sig_dwls_messmer_recreated_counts/Sig.RData')
-load('sig_dwls_messmer_recreated_counts_timepoint1/Sig.RData')
+load('sig_dwls/Sig.RData')
 ```
 
 
@@ -255,11 +255,11 @@ ggVennDiagram::ggVennDiagram(list(Meta = bulk_meta_adipo$sample_id, Matrix = col
 ## Compositional Results
 
 Here the compositional data are visualized by stacked bar plots with days as facets.
-LongNT and ShortNT are not relevant for this experiment, so me do not consider
+LongNT and ShortNT are not relevant for this experiment, so we do not consider
 "group".
 
 ```{r comp-results-adipo, fig.width=10, fig.height=5}
-comp_adipo <- readRDS('sig_dwls_messmer_recreated_counts_noTeno/adipo_compositions_messmer2023_dwls_signature.Rds')
+comp_adipo <- readRDS('sig_dwls/adipo_compositions_messmer2023_dwls_signature.Rds')
 
 # preprocess and extract injection
 df_adipo <- comp_adipo %>% as.data.frame() %>%
@@ -287,11 +287,11 @@ p <- df_adipo %>%
   )
 
 p
-ggsave(filename = "~/artifical_meat_deconv/images/adipo_stacked_barplot.png", plot = p, width = 12)
+ggsave(filename = "Figures/adipo_stacked_barplot.png", plot = p, width = 12)
 ```
 
 ```{r comp-results-myo, fig.width=10, fig.height=5}
-comp_myo <- readRDS('sig_dwls_messmer_recreated_counts_noTeno/myo_compositions_messmer2023_dwls_signature.Rds')
+comp_myo <- readRDS('sig_dwls/myo_compositions_messmer2023_dwls_signature.Rds')
 rownames(comp_myo) <- gsub(".*_", "", rownames(comp_myo))
 
 cell_types <- colnames(comp_myo)
@@ -314,7 +314,7 @@ p <- ggplot(long_myo, aes(x = bio_replicate, y = proportion, fill = cell_type)) 
   theme_minimal()
 
 p
-ggsave("~/artifical_meat_deconv/images/myo_stacked_barplot.png", width = 12)
+ggsave("Figures/myo_stacked_barplot.png", width = 12)
 ```
 
 Lastly, we plot heatmaps with sample-clustering and annotations.
