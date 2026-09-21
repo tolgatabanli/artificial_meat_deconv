@@ -75,8 +75,9 @@ sample_from_seurat <- function(seurat_obj, sampling_matrix) {
     tissue <- tissue[1]
   }
   
-  partitions <- split(colnames(seurat_obj), seurat_obj$cell_type)
-  #partitions[["Unknown cells"]] <- NULL # we're ignoring unknown cells to decrease analytic burden:)
+  partitions <- split(colnames(seurat_obj), seurat_obj$cell_type, drop = T)
+  partitions[["Unknown cells"]] <- NULL # we're ignoring unknown cells to decrease analytic burden:)
+  partitions <- partitions[names(partitions) %in% colnames(sampling_matrix)]
   
   cols_to_select <- sapply(names(partitions),
                            function(ct_name) sample(partitions[[ct_name]],
