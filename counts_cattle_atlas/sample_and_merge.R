@@ -99,14 +99,14 @@ sampled_list <- mclapply(rds_files, function(f) {
 # takes ca. 15 mins
 
 final_obj <- merge(sampled_list[[1]], y = sampled_list[-1])
-#final_obj$label <- trimws(final_obj$label)
+final_obj$label <- trimws(final_obj$label)
 final_obj$cell_type <- trimws(final_obj$cell_type)
 final_obj$cell_type <- gsub("'", "", final_obj$cell_type) # Henle's loop causes issues in column parse
 final_obj$cell_type <- gsub("/", "_", final_obj$cell_type) # inner/outer -> remove slash
 
 # convert cattle IDs to ENSEMBL
 # remove multimappers (symbol to multiple Ensembl IDs)
-# remove same-mappers (multiple symbols to same Ensembl ID)
+# aggregate same-mappers (multiple symbols to same Ensembl ID)
 message("Mapping ids...")
 library(org.Bt.eg.db)
 library(AnnotationDbi)
