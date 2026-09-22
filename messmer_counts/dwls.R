@@ -53,14 +53,17 @@ col_meta <- col_meta[common, ]
 ## ----celltype-occurrences, fig.height=5---------------------------------------
 table(injection = col_meta$orig.ident, cell_type = col_meta$predicted.pheno) %>%
   as.data.frame() %>%
+  mutate(cell_type = gsub("Monocytes - M.$", "Monocytes-M\u03A6", cell_type)) %>%
+  filter(Freq > 0) %>%
   ggplot(aes(x = cell_type, y = Freq, fill = injection)) +
   geom_bar(stat = "identity") +
-  scale_y_log10() +
+  scale_y_log10(labels = scales::label_log()) +
+  scale_fill_brewer(palette = "Pastel1") +
   geom_text(aes(label = Freq), position = position_stack(vjust = 0.5)) +
-  labs(x = "", y = "Count") +
-  theme_bw() +
+  labs(x = "", y = "Count", title = "Messmer2023") +
+  theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust=1, size = 11), panel.grid.major.x = element_blank())
-ggsave("Figures/messmer2023_distro_cell_types.png", width = 8, height = 5)
+ggsave("Figures/messmer2023_distro_cell_types.png", width = 7, height = 6)
 
 #' 
 #' They are not equally represented. FAPs, SCs, and VECs tend to occur much more
