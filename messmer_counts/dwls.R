@@ -192,6 +192,7 @@ pheatmap::pheatmap(corr_mat,
 ## ----signature-load, echo=FALSE-----------------------------------------------
 # load Signature without Teno for actual deconvolution
 load('sig_dwls/Sig.RData')
+colnames(Sig) <- gsub("Monocytes - M.$", "Monocytes-M\u03A6", colnames(Sig))
 
 #' 
 #' 
