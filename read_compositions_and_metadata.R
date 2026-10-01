@@ -77,6 +77,11 @@ comp_files <- list(
       scaden    = "counts_cattle_atlas/sig_scaden_fine/adipo_compositions_cattleatlas_scaden.Rds"
     ),
     messmer = list(
+      dwls      = "messmer_counts/sig_dwls_inj1/adipo_compositions_messmer2023_dwls_signature.Rds",
+      rectangle = "messmer_counts/sig_rectangle_inj1/rectangle_estimations_adipo.csv",
+      scaden    = "messmer_counts/sig_scaden_inj1/adipo_compositions_messmer2023_scaden.Rds"
+    ), 
+    messmer_full = list(
       dwls      = "messmer_counts/sig_dwls/adipo_compositions_messmer2023_dwls_signature.Rds",
       rectangle = "messmer_counts/sig_rectangle/rectangle_estimations_adipo.csv",
       scaden    = "messmer_counts/sig_scaden/adipo_compositions_messmer2023_scaden.Rds"
@@ -94,6 +99,11 @@ comp_files <- list(
       scaden    = "counts_cattle_atlas/sig_scaden_fine/myo_compositions_cattleatlas_scaden.Rds"
     ),
     messmer = list(
+      dwls      = "messmer_counts/sig_dwls_inj1/myo_compositions_messmer2023_dwls_signature.Rds",
+      rectangle = "messmer_counts/sig_rectangle_inj1/rectangle_estimations_myo.csv",
+      scaden    = "messmer_counts/sig_scaden_inj1/myo_compositions_messmer2023_scaden.Rds"
+    ),
+    messmer_full = list(
       dwls      = "messmer_counts/sig_dwls/myo_compositions_messmer2023_dwls_signature.Rds",
       rectangle = "messmer_counts/sig_rectangle/rectangle_estimations_myo.csv",
       scaden    = "messmer_counts/sig_scaden/myo_compositions_messmer2023_scaden.Rds"
