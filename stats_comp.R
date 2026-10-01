@@ -185,122 +185,42 @@ for (exp in exps) {
 }
 
 
-ggplot(df, aes(x = method, y = val)) +
-  geom_violin() +
-  facet_wrap(~ cell_type)
-
-########
-########
-########
-# Read data
-meta_myo <- read.csv("artifical_meat_deconv/meta_bulk_myo.csv")
-
-messmer_myo_timepoints <- readRDS("/nfs/home/students/t.tabanli/artifical_meat_deconv/sig_dwls_messmer_recreated_counts_noTeno/myo_compositions_messmer2023_dwls_signature.Rds")
-messmer_myo_timepoints[messmer_myo_timepoints < 0] <- 0
-messmer_myo_timepoints <- messmer_myo_timepoints %>%
-  as.data.frame() %>%
+### backup
+# 5. make geometric mean barplots
+cell_types <- colnames(mat_processed)
+p <- clr(mat_processed) %>% as.data.frame() %>%
   rownames_to_column("sample_id") %>%
-  pivot_longer(cols = -sample_id, names_to = "cell_type", values_to = "proportion") %>%
-  separate_wider_delim(cell_type, delim = "_", names = c("injection", "cell_type")) %>%
-  mutate(sample_id = gsub(".*_", "", sample_id))
-
-messmer_myo_all <- messmer_myo_timepoints %>%
-  group_by(sample_id, cell_type) %>%
-  summarise(proportion = sum(proportion), .groups = "drop") %>%
-  pivot_wider(names_from = cell_type, values_from = proportion) %>%
-  column_to_rownames("sample_id") %>%
-  as.matrix()
-
-messmer_myo_tp1 <- readRDS("/nfs/home/students/t.tabanli/artifical_meat_deconv/sig_dwls_messmer_recreated_counts_timepoint1_noTeno/myo_compositions_messmer2023_dwls_signature.Rds")
-messmer_myo_tp1[messmer_myo_tp1 < 0] <- 0
-rownames(messmer_myo_tp1) <- gsub(".*_", "", rownames(messmer_myo_tp1))
-colnames(messmer_myo_tp1) <- gsub("Injection1_", "", colnames(messmer_myo_tp1))
+  inner_join(meta, by = "sample_id") %>%
+  pivot_longer(cols = all_of(cell_types), names_to = "cell_type", values_to = "clr") %>%
+  group_by(across(all_of(c(vars_of_interest, "cell_type")))) %>%
+  summarise(clr_mean = mean(clr), .groups = "drop") %>%
+  ggplot(aes(x = day, y = clr_mean)) +
+  geom_col() +
+  facet_grid(as.formula(paste(vars_of_interest[2], "~ cell_type")), scales = "free_x") +
+  theme_bw() +
+  labs(title = "", x = "Cell Type", y = "Mean CLR")
+ggsave(file.path("figures_geometricMean", paste0(paste(exp, ref, method, sep = "_"), ".png")), p)
+cat("\tGeometric mean barplots done.\n")
 
 
-messmer_myo_all <- messmer_myo_all[rownames(messmer_myo_all) %in% meta_myo$sample_id, ]
-messmer_myo_tp1 <- messmer_myo_tp1[rownames(messmer_myo_tp1) %in% meta_myo$sample_id, ]
 
-# PCA for All vs Injection 1 
-stacked <- rbind(messmer_myo_all, messmer_myo_tp1)
-stacked[stacked < 0] <- 0
-source_label <- c(rep("all", nrow(comp_all)), rep("tp1", nrow(comp_tp1)))
+names_of_groups <- rownames(group_contrast_results)
+split_pairs <- strsplit(names_of_groups, split = " vs ")
 
-clr_stacked  <- as.matrix(clr(acomp(stacked)))
-pca          <- prcomp(clr_stacked, scale. = FALSE)
-var_exp      <- round(summary(pca)$importance[2, 1:2] * 100, 1)
+external_groups <- unique(unlist(split_pairs))
+group_signif_matrix <- matrix(0, nrow = length(external_groups), ncol = length(external_groups))
+rownames(group_signif_matrix) <- external_groups
+colnames(group_signif_matrix) <- external_groups
+for (i in 1:nrow(group_contrast_results)) {
+  if (group_contrast_results[i, "Adj p-value"] > 0.05) next
+  pair <- split_pairs[[i]]
+  group_signif_matrix[pair[1], pair[2]] <- 1 #group_contrast_results[i, "Adj p-value"]
+  group_signif_matrix[pair[2], pair[1]] <- 1
+}
 
-pca_df <- data.frame(
-  PC1    = pca$x[, 1],
-  PC2    = pca$x[, 2],
-  source = source_label,
-  sample = c(rownames(messmer_myo_all), rownames(messmer_myo_tp1))
-)
-
-p_pca <- ggplot(pca_df, aes(x = PC1, y = PC2, color = source, label = sample)) +
-  geom_point(size = 3, alpha = 0.85) +
-  geom_text_repel(size = 2.5, show.legend = FALSE, max.overlaps = 20) +
-  scale_color_manual(values = c("all" = "#2C6FAC", "tp1" = "#C06010"),
-                     name = "Signature") +
-  labs(title   = "Aitchison PCA - Compare Compositions of All vs Timepoint 1",
-       x       = paste0("PC1 (", var_exp[1], "%)"),
-       y       = paste0("PC2 (", var_exp[2], "%)")) +
-  theme_minimal() +
-  theme(legend.position = "bottom")
-p_pca
-
-# Compare all timepoints
-clr_all  <- as.matrix(clr(acomp(messmer_myo_all)))
-dist_all <- dist(clr_all, method = "euclidean")
-
-pairs_to_compare <- list(
-  c("Injection1", "Injection2"),
-  c("Injection3", "Injection4"),
-  c("Injection3", "Injection5"),
-  c("Injection4", "Injection5")
-)
-pairwise_results <- lapply(pairs_to_compare, function(x) {
-  inj1 <- messmer_myo_timepoints %>%
-    filter(injection == x[1]) %>%
-    pivot_wider(names_from = cell_type, values_from = proportion) %>%
-    column_to_rownames("sample_id") %>%
-    select(-injection) %>%
-    as.matrix()
-  
-  inj2 <- messmer_myo_timepoints %>%
-    filter(injection == x[2]) %>%
-    pivot_wider(names_from = cell_type, values_from = proportion) %>%
-    column_to_rownames("sample_id") %>%
-    select(-injection) %>%
-    as.matrix()
-  
-  common_ct <- intersect(colnames(inj1), colnames(inj2))
-  together  <- rbind(inj1[, common_ct], inj2[, common_ct])
-  together[together < 0] <- 0
-  
-  meta <- rbind(
-    cbind(meta_myo[match(rownames(inj1), meta_myo$sample_id), ], injection = x[1]),
-    cbind(meta_myo[match(rownames(inj2), meta_myo$sample_id), ], injection = x[2])
-  )
-  
-  clr_together  <- as.matrix(clr(acomp(together)))
-  dist_together <- dist(clr_together, method = "euclidean")
-  res <- adonis2(dist_together ~ injection, data = meta, permutations = 999, by = "margin")
-  
-  list(inj1 = x[1], inj2 = x[2],
-       ct_inj1   = colnames(inj1),
-       ct_inj2   = colnames(inj2),
-       common_ct = common_ct,
-       n_shared  = length(common_ct),
-       pval   = res[1, "Pr(>F)"],
-       R2     = res[1, "R2"],
-       F_stat = res[1, "F"])
-})
-
-# ── Panel 1: cell type presence/absence per injection ────────────────────────
-presence_df <- messmer_myo_timepoints %>%
-  distinct(injection, cell_type) %>%
-  mutate(status = "present") %>%
-  complete(injection, cell_type, fill = list(status = "absent"))
+# red is significant
+pheatmap::pheatmap(group_signif_matrix, display_numbers = F, cluster_rows = F, cluster_cols = F, legend = F)
+ggsave(file.path(fig_path, paste0("heatmap_group_contrast_", fig_suffix, ".png")))
 
 
 
