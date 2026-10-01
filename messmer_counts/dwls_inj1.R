@@ -53,20 +53,20 @@ ggsave("Figures/messmer2023_distro_cell_types_inj1.png", width = 7, height = 6)
 
 
 ## ----build-signature, eval=FALSE----------------------------------------------
-omnideconv::build_model_dwls(single_cell_object = mat,
-                             cell_type_annotations = col_meta$predicted.pheno,
-                             dwls_method = "mast_optimized",
-                             path = "sig_dwls_withTeno_inj1",
-                             verbose = T, ncores = 6) # TODO: defaults: diff_cutoff = 0.5, pval_cutoff = 0.01
-gc()
-# without tenocytes
-noTenocyte_index <- col_meta$predicted.pheno != "Tenocytes"
-omnideconv::build_model_dwls(single_cell_object = mat[, noTenocyte_index],
-                             cell_type_annotations = col_meta$predicted.pheno[noTenocyte_index],
-                             dwls_method = "mast_optimized",
-                             path = "sig_dwls_inj1",
-                             verbose = T, ncores = 10)
-gc()
+# omnideconv::build_model_dwls(single_cell_object = mat,
+#                              cell_type_annotations = col_meta$predicted.pheno,
+#                              dwls_method = "mast_optimized",
+#                              path = "sig_dwls_withTeno_inj1",
+#                              verbose = T, ncores = 6) # TODO: defaults: diff_cutoff = 0.5, pval_cutoff = 0.01
+# gc()
+# # without tenocytes
+# noTenocyte_index <- col_meta$predicted.pheno != "Tenocytes"
+# omnideconv::build_model_dwls(single_cell_object = mat[, noTenocyte_index],
+#                              cell_type_annotations = col_meta$predicted.pheno[noTenocyte_index],
+#                              dwls_method = "mast_optimized",
+#                              path = "sig_dwls_inj1",
+#                              verbose = T, ncores = 10)
+# gc()
 #' 
 ## ----signature-check, eval = FALSE--------------------------------------------
 # for the markdown, this block is skipped and
@@ -153,38 +153,18 @@ gc()
 #' 
 ## ----signature-load, echo=FALSE-----------------------------------------------
 # load Signature without Teno for actual deconvolution
-load('sig_dwls_inj1/Sig.RData')
+load('sig_dwls_withTeno_inj1/Sig.RData')
 colnames(Sig) <- gsub("Monocytes - M.$", "Monocytes-M\u03A6", colnames(Sig))
 
 #' 
 #' 
 #' # Deconvolution
-#' 
-#' Before applying the deconvolution, here is a utility function to read
-#' TPM matrices of the bulk sequencing experiment.
-#' 
-## ----func-def-read-tpm--------------------------------------------------------
-read_tpm <- function(path) {
-  bulk_matrix <- data.table::fread(path)
-  
-  char_cols <- names(bulk_matrix)[sapply(bulk_matrix, is.character)]
-  if (length(char_cols) == 0) stop("No character column found for gene IDs.")
-  gene_col_name <- if ("gene_id" %in% char_cols) "gene_id" else char_cols[1]
-  if (length(char_cols) > 1) {
-    warning("Multiple character columns found: ", paste(char_cols, collapse = ", "),
-            ". Using '", gene_col_name, "' as gene identifiers; discarding others.", call. = FALSE)
-  }
-  gene_col <- bulk_matrix[[gene_col_name]]
-  bulk_matrix[, (char_cols) := NULL]
-  mat <- as.matrix(bulk_matrix)
-  rownames(mat) <- gene_col
-  return(mat)
-}
 
 
 ## ----read-meta----------------------------------------------------------------
 bulk_matrix_adipo <- read_tpm("/nfs/data2/huji_artificial_meat/adipogenesis/adipogenesis_tpm.tsv")
-bulk_meta_adipo <- read.csv("/nfs/data2/huji_artificial_meat/adipogenesis/sample_sheet_cleaned.csv", header = T)
+bulk_meta_adipo <- read.csv("/nfs/data2/huji_artificial_meat/adipogenesis/sample_sheet_cleaned.csv", header = T) %>%
+  mutate(day = factor(day, levels = unique(day)[order(as.numeric(gsub("[^0-9]", "", unique(day))))]))
 bulk_matrix_adipo <- bulk_matrix_adipo[, bulk_meta_adipo$sample_id]
 
 bulk_matrix_myo <- read_tpm("/nfs/data2/huji_artificial_meat/myogenesis/nfcore_out/star_salmon/salmon.merged.gene_tpm.tsv")
@@ -208,74 +188,10 @@ gc()
 message("___myo___")
 comp_myo   <- deconvolute_dwls_parallel(bulk_matrix_myo,   Sig, ncores = 13)
 
-saveRDS(comp_adipo, "sig_dwls_inj1/adipo_compositions_messmer2023_dwls_signature.Rds")
-saveRDS(comp_myo, "sig_dwls_inj1/myo_compositions_messmer2023_dwls_signature.Rds")
+saveRDS(comp_adipo, "sig_dwls_withTeno_inj1/adipo_compositions_messmer2023_dwls_signature.Rds")
+saveRDS(comp_myo, "sig_dwls_withTeno_inj1/myo_compositions_messmer2023_dwls_signature.Rds")
 
 
-#' 
-#' ## Compositional Results
-#' 
-#' Here the compositional data are visualized by stacked bar plots with days as facets.
-#' LongNT and ShortNT are not relevant for this experiment, so we do not consider
-#' "group".
-#' 
-## ----comp-results-adipo, fig.width=10, fig.height=5---------------------------
-comp_adipo <- readRDS('sig_dwls_inj1/adipo_compositions_messmer2023_dwls_signature.Rds')
-
-# preprocess and extract injection
-adipo_cell_types <- colnames(comp_adipo)
-
-df_adipo <- comp_adipo %>% as.data.frame() %>%
-  rownames_to_column("sample_id") %>%
-  left_join(bulk_meta_adipo, by = "sample_id") %>%
-  pivot_longer(cols = all_of(adipo_cell_types),
-               names_to = "cell_type",
-               values_to = "proportion")
-
-# Long
-p <- df_adipo %>%
-  ggplot(aes(x = sample_id, y = proportion, fill = cell_type)) +
-  geom_col(linewidth = 0.8) +
-  coord_flip() +
-  facet_grid(day ~ ., scales = "free_y", space = "free_y") +
-  scale_fill_manual(values = unname(pals::alphabet(n_distinct(df_adipo$cell_type))), name = "Cell type") +
-  theme_minimal() +
-  labs(y = "Proportion", x = NULL) +
-  theme(
-    strip.text.y.right   = element_text(angle = 0, hjust = 0.5, face = "bold"),
-    strip.background.y   = element_rect(fill = "gray90", color = "black", linewidth = 0.8),
-    panel.border         = element_rect(color = "gray70", fill = NA, linewidth = 0.4),
-    panel.spacing.y      = unit(0.3, "lines")
-  )
-
-p
-ggsave(filename = "Figures/messmer2023_dwls_adipo_stacked_barplot_inj1.png", plot = p, width = 12)
-
-#' 
-## ----comp-results-myo, fig.width=10, fig.height=5-----------------------------
-comp_myo <- readRDS('sig_dwls_inj1/myo_compositions_messmer2023_dwls_signature.Rds')
-rownames(comp_myo) <- gsub(".*_", "", rownames(comp_myo))
-
-cell_types <- colnames(comp_myo)
-
-joined_myo <- comp_myo %>%
-  as.data.frame() %>%
-  rownames_to_column("sample_id") %>%
-  left_join(bulk_meta_myo, by = "sample_id") %>%
-  drop_na()
-
-long_myo <- joined_myo %>%
-  pivot_longer(cols = cell_types, names_to = "cell_type", values_to = "proportion")
-
-p <- ggplot(long_myo, aes(x = bio_replicate, y = proportion, fill = cell_type)) +
-  geom_col() +
-  coord_flip() +
-  facet_wrap(day ~ group, scales = "free_y") +
-  scale_fill_manual(values = unname(pals::alphabet(n_distinct(long_myo$cell_type))), name = "Cell type") +
-  theme_minimal()
-
-p
-ggsave("Figures/messmer2023_dwls_myo_stacked_barplot_inj1.png", width = 12)
 
 #' 
 #' Lastly, we plot heatmaps with sample-clustering and annotations.
