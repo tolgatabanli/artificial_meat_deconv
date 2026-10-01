@@ -227,21 +227,24 @@ ggsave(file.path(fig_path, paste0("heatmap_group_contrast_", fig_suffix, ".png")
 
 
 
-# treatment descriptions for reference
-treatment_key <- meta_sub %>%
-  distinct(group, day, treatment) %>%
-  arrange(day, group)
+# 8. which logratios drive the differences?
+# considers significant group contrasts and make a boxplot
+lapply(, function(x) pheatmap::pheatmap(x))
 
-# PCA
-pca    <- prcomp(clr_all, scale. = FALSE)
-var_exp <- round(summary(pca)$importance[2, 1:2] * 100, 1)
-pca_df <- data.frame(PC1 = pca$x[,1], PC2 = pca$x[,2], sample_id = rownames(clr_all)) %>%
-  left_join(meta_sub, by = "sample_id")
+# 
+plot.princomp.acomp(princomp.acomp(mat_processed))
+pc <- princomp(mat_processed)
 
-ggplot(pca_df, aes(PC1, PC2, color = day)) +
-  geom_point(size = 2.5) + #stat_ellipse(linetype = "dashed") +
-  labs(x = paste0("PC1 (", var_exp[1], "%)"), y = paste0("PC2 (", var_exp[2], "%)")) +
-  theme_minimal()
+plot(pc,type="biplot")
+plot(pc,choice=c(1,3),type="biplot")
+plot(pc,type="loadings")
+plot(pc,type="loadings",scale.sdev=-1) # Downward
+plot(pc,type="relative",scale.sdev=NA) # The directions
+plot(pc,type="relative",scale.sdev=1) # one sigma Upward 
+plot(pc,type="relative",scale.sdev=-1) # one sigma Downward
+biplot(pc)
+screeplot(pc)
+loadings(pc)
 
 ggplot(pca_df, aes(PC1, PC2, color = group)) +
   geom_point(size = 2.5) + #stat_ellipse(linetype = "dashed") +
