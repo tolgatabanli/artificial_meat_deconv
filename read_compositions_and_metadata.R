@@ -53,7 +53,9 @@ read_composition <- function(file) {
 read_sample_meta <- function(file) {
   read_csv(file, col_names = TRUE) %>%
     dplyr::select(-dplyr::matches("\\.\\.\\.[0-9]+")) %>% # drops unnecessary cols (...raw.file etc.)
-    mutate(day = factor(day, levels = unique(day)[order(as.numeric(gsub("[^0-9]", "", unique(day))))])) %>%
+    mutate(day = gsub("d", "D", day)) %>%
+    # mutate(day = factor(day, levels = unique(day)[order(as.numeric(gsub("[^0-9]", "", unique(day))))])) %>%
+    mutate(day = sprintf("D%02d", as.numeric(gsub("[^0-9]", "", day)))) %>%
     as.data.frame() %>% janitor::clean_names()
 }
 
