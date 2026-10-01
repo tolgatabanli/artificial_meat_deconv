@@ -183,6 +183,7 @@ for (exp in exps) {
     }
   }
 }
+cat("IT RAN THROUGH")
 
 
 ### backup
@@ -246,13 +247,12 @@ biplot(pc)
 screeplot(pc)
 loadings(pc)
 
-ggplot(pca_df, aes(PC1, PC2, color = group)) +
-  geom_point(size = 2.5) + #stat_ellipse(linetype = "dashed") +
-  labs(x = paste0("PC1 (", var_exp[1], "%)"), y = paste0("PC2 (", var_exp[2], "%)")) +
-  theme_minimal()
+# james multivariate test is unnecessary, since it requires n < p and
+# is parametric.
+# james(y1, y2, a = 0.05, R = 999, graph = FALSE)
 
-# PERMDISP
-boxplot(disp_day, main = "PERMDISP — day",   ylab = "Distance to centroid")
-boxplot(disp_grp, main = "PERMDISP — group", ylab = "Distance to centroid")
+# Logcontrast regression,
+# but not relevant :( since this is to predict a continuous response variable
+# Compositional::lc.reg(y, x, z = NULL, xnew = NULL, znew = NULL)
 
 
