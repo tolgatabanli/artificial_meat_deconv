@@ -82,9 +82,11 @@ patched_DEAnalysisMASTOptimized <- function(scdata, id, path, verbose = FALSE) {
   }
   return(list_lrTest.table)
 }
-environment(patched_DEAnalysisMASTOptimized) <- asNamespace("DWLS")
-assignInNamespace("DEAnalysisMASTOptimized", patched_DEAnalysisMASTOptimized, ns = "DWLS")
-
+# assign to namespace, but only if DWLS exists, or else this causes problems in Scaden
+if (requireNamespace("DWLS")) {
+  environment(patched_DEAnalysisMASTOptimized) <- asNamespace("DWLS")
+  assignInNamespace("DEAnalysisMASTOptimized", patched_DEAnalysisMASTOptimized, ns = "DWLS")
+}
 
 # Samples in the bulk matrix are divided to be processed in parallel.
 # Used in dwls.R scripts in reference data set deconvolutions.
