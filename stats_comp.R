@@ -182,8 +182,6 @@ for (exp in exps) {
       run_perlog(exp, ref, method)
     }
   }
-  
-  return(df)
 }
 
 
@@ -304,65 +302,10 @@ presence_df <- messmer_myo_timepoints %>%
   mutate(status = "present") %>%
   complete(injection, cell_type, fill = list(status = "absent"))
 
-# mark which cell types were shared in ANY comparison
-shared_any <- Reduce(union, lapply(pairwise_results, `[[`, "common_ct"))
 
-presence_df <- presence_df %>%
-  mutate(shared = cell_type %in% shared_any,
-         label  = case_when(
-           status == "present" & shared  ~ "present & compared",
-           status == "present" & !shared ~ "present, never compared",
-           TRUE                          ~ "absent"
-         ))
 
-p1 <- ggplot(presence_df, aes(x = injection, y = cell_type, fill = label)) +
-  geom_tile(color = "white", linewidth = 0.4) +
-  scale_fill_manual(values = c(
-    "present & compared"     = "#2C6FAC",
-    "present, never compared"= "#A8C8E8",
-    "absent"                 = "#EEEEEE"),
-    name = NULL) +
-  labs(title = "Cell type presence per injection", x = NULL, y = NULL) +
-  theme_minimal() +
-  theme(axis.text.x  = element_text(angle = 45, hjust = 1),
-        legend.position = "bottom",
-        panel.grid   = element_blank())
-p1
-# ── Panel 2: pairwise PERMANOVA summary ──────────────────────────────────────
-results_df <- do.call(rbind, lapply(pairwise_results, function(r) {
-  data.frame(
-    pair     = paste(r$inj1, "vs", r$inj2),
-    inj1     = r$inj1,
-    inj2     = r$inj2,
-    n_shared = r$n_shared,
-    pval     = r$pval,
-    R2       = round(r$R2, 3),
-    F_stat   = round(r$F_stat, 2),
-    sig      = cut(r$pval, c(-Inf, 0.001, 0.01, 0.05, Inf),
-                   labels = c("***", "**", "*", "n.s."))
-  )
-}))
 
-p2 <- ggplot(results_df, aes(x = pair, y = R2)) +
-  geom_col(aes(fill = pval), width = 0.6) +
-  geom_text(aes(label = sprintf("p=%.3f %s\nn=%d ct", pval, sig, n_shared)),
-            vjust = -0.3, size = 2.8, lineheight = 0.9) +
-  geom_text(aes(y = R2 / 2, label = sprintf("F=%.2f", F_stat)),
-            color = "white", size = 2.8, fontface = "bold") +
-  scale_fill_gradientn(
-    colors = c("#C0392B", "#E67E22", "#BDC3C7"),
-    values = scales::rescale(c(0, 0.05, 1)),
-    limits = c(0, 1), name = "p-value") +
-  scale_y_continuous(expand = expansion(mult = c(0, 0.25))) +
-  labs(title = "Pairwise PERMANOVA (Aitchison distance)",
-       x = NULL, y = "R²") +
-  theme_minimal() +
-  theme(axis.text.x   = element_text(angle = 45, hjust = 1),
-        panel.grid.major.x = element_blank())
-p2
 
-# PERMANOVA + PERMDISP on messmer_myo_all
-meta_sub <- meta_myo[match(rownames(messmer_myo_all), meta_myo$sample_id), ]
 
 # treatment descriptions for reference
 treatment_key <- meta_sub %>%
