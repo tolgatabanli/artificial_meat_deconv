@@ -1,5 +1,6 @@
 library(tidyverse)
 
+# Cattle cell-type aggregation
 if (!file.exists("converter_lineage.csv")) {
   # Read cattle, just for the cell lineage aggregation
   cattle <- readRDS("counts_cattle_atlas/sampled_cattle_atlas.RDS")
@@ -18,10 +19,26 @@ if (!file.exists("converter_lineage.csv")) {
   converter_lineage <- read.csv("converter_lineage.csv")
 }
 
-agg_to_lineage <- function(mat) {
+# Wang cell-type aggregation
+wang_mapping <- c(
+  "FAP-1" = "FAP", "FAP-2" = "FAP",
+  "Granulocyte-1" = "Granulocyte", "Granulocyte-2" = "Granulocyte",
+  "SC" = "SC",
+  "MuC-1" = "MuC", "MuC-2" = "MuC",
+  "LEndoC" = "EndoC", "VEndoC" = "EndoC", "Non-VEndoC" = "EndoC",
+  "B cell" = "Lymphoid", "CD3 T cell" = "Lymphoid", "CD4 T cell" = "Lymphoid", "CD8 T cell" = "Lymphoid", "Proliferating T cell" = "Lymphoid", "Natural killer cell" = "Lymphoid",
+  "Slow myofiber" = "Myofiber", "Fast myofiber" = "Myofiber",
+  "Mo_Ma" = "Myeloid", "Tenocyte" = "Myeloid", "Neutrophil" = "Myeloid"
+)
+converter_wang <- unique(data.frame(
+  original = c(names(wang_mapping), "Unknown"),
+  new_name = c(unname(wang_mapping), "Unknown")
+))
+
+agg_to_lineage <- function(mat, converter) {
   mat <- as.matrix(mat)
-  index_to_lineage <- match(colnames(mat), converter_lineage$original)
-  colnames(mat) <- converter_lineage$new_name[index_to_lineage]
+  index_to_lineage <- match(colnames(mat), converter$original)
+  colnames(mat) <- converter$new_name[index_to_lineage]
   t(rowsum(t(mat), group = colnames(mat)))
 }
 
@@ -50,7 +67,7 @@ raw_meta_myo <- read_sample_meta("/nfs/data2/huji_artificial_meat/myogenesis/sam
   mutate(sample_id = gsub(".*_", "", sample_id))
 
 # composition matrices: experiment -> reference -> method
-# comp_files <- list(
+comp_files <- list(
   adipo = list(
     cattle = list(
       dwls      = "counts_cattle_atlas/sig_dwls_fine/adipo_compositions_cattleatlas_dwls_signature.Rds",
@@ -109,4 +126,5 @@ fix_colnames <- function(mat) {
 for (exp in names(comp_mats)) comp_mats[[exp]]$messmer <- lapply(comp_mats[[exp]]$messmer, fix_colnames)
 
 # aggregate cattle cells to lineages
-for (exp in names(comp_mats)) comp_mats[[exp]]$cattle <- lapply(comp_mats[[exp]]$cattle, agg_to_lineage)
+for (exp in names(comp_mats)) comp_mats[[exp]]$cattle <- lapply(comp_mats[[exp]]$cattle, agg_to_lineage, converter = converter_lineage)
+for (exp in names(comp_mats)) comp_mats[[exp]]$wang <- lapply(comp_mats[[exp]]$wang, agg_to_lineage, converter = converter_wang)
