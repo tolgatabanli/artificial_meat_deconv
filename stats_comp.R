@@ -14,14 +14,14 @@ library(zCompositions)
 library(ComplexHeatmap)
 
 exps <- c("adipo", "myo")
-refs <- c("cattle", "messmer", "wang")
+refs <- c("cattle", "messmer", "wang", "messmer_full")
 methods <- c("dwls", "rectangle", "scaden")
 
 # PERLOG inferential analysis
 run_perlog <- function(exp, ref, method) {
   cat("Processing:", exp, ref, method)
   # 1. choose matrix to analyze
-  mat <- new_mats[[exp]][[ref]][[method]]
+  mat <- comp_mats[[exp]][[ref]][[method]]
 
   meta <- if (exp == "adipo") raw_meta_adipo else raw_meta_myo
   vars_of_interest <- if (exp == "adipo") c("day", "individual") else c("day", "medium")
