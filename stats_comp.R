@@ -1,51 +1,12 @@
 library(compositions)
 library(vegan)
-library(ggrepel)
 library(tidyverse)
 setwd("~/artifical_meat_deconv/")
 source("toolkit.R")
 
-# Compare DWLS and Rectangle compositions of myogenesis
-# If sample_meta is given, returns a list:
-#   $mat | matrix result containing the metadata
-#   $metadata | data frame of the sample_meta
-#   $cell_types
-read_composition <- function(file, sample_meta = NULL) {
-  if (endsWith(file, ".csv")) file <- read_csv(file)
-  else if (endsWith(file, ".Rds")) file <- readRDS(file)
-  
-  mat <- as.data.frame(file)
-  if ("index" %in% colnames(mat)) mat <- column_to_rownames(mat, "index")
-  
-  renames <- c("Glial cells" = "Glial-cells", "Monocytes" = "Monocytes - M?", "B-T-NK cells" = "B-T-NK-cells")
-  renames <- renames[renames %in% colnames(mat)]
-  mat <- dplyr::rename(mat, any_of(renames))
-  
-  if (!is.null(sample_meta)) {
-    cat("Joining with metadata")
-    metadata <- read_csv(sample_meta, col_names = T) %>%
-      select(-any_of("...1")) %>%
-      # factorize day
-      mutate(day = factor(day, levels = unique(day)[order(as.numeric(gsub("[^0-9]", "", unique(day))))]))
-    cell_types <- colnames(mat)
-    cat("Cell types: "); cat(cell_types, sep = ", ")
-    cat("columns:", colnames(metadata), sep = ", ")
-    
-    mat <- mat %>% rownames_to_column("sample_id") %>%
-      inner_join(metadata, by = "sample_id")
-      #pivot_longer(all_of(cell_types), names_to="cell_type", values_to="proportion") %>% 
-      #relocate(c("sample_id", "cell_type", "proportion"))
-    
-    return(mat)
-  }
-  else return(mat)
-}
+# Reading routine for composition matrices and sample metadata
+source("read_compositions_and_metadata.R")
 
-comp_adipo_rectangle <- read_composition("messmer_counts/rectangle_results/rectangle_estimations_adipo.csv", "/nfs/data2/huji_artificial_meat/adipogenesis/sample_sheet_cleaned.csv")
-comp_adipo_dwls <- read_composition('~/artifical_meat_deconv/messmer_counts/dwls_results/no_teno/adipo_compositions_messmer2023_dwls_signature.Rds', "/nfs/data2/huji_artificial_meat/adipogenesis/sample_sheet_cleaned.csv")
-
-comp_myo_rectangle <- read_composition("messmer_counts/rectangle_results/rectangle_estimations_myo.csv", "/nfs/data2/huji_artificial_meat/myogenesis/sample_sheet_cleaned.csv")
-comp_myo_dwls <- read_composition('~/artifical_meat_deconv/messmer_counts/dwls_results/no_teno/myo_compositions_messmer2023_dwls_signature.Rds', "/nfs/data2/huji_artificial_meat/myogenesis/sample_sheet_cleaned.csv")
 
 # remove satellite cell experiment
 comp_myo_rectangle <- comp_myo_rectangle %>% filter(!grepl("Sat", sample_id))
