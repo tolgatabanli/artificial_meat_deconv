@@ -62,117 +62,135 @@ run_perlog <- function(exp, ref, method) {
   # 6. PERLOG analysis
   # day - individual for adipogenesis, day x medium for myogenesis
   # For adipo: stratify by individual, test by day
-  # For myo: stratify by medium, test by day
-  groups <- apply(meta[, vars_of_interest], 1, paste, collapse = "_")
-  capture.output(res <- perLog(mat_processed,
-                          groups = groups,
-                          p = "auto", alpha = 0.05, R = 1000,
-                          posthoc.g = TRUE, posthoc.lr = TRUE, mAdj = "bonferroni"),
-                        file = nullfile())
-  cat("\tPERLOG done.\n")
-  p_overall <- res$pvalOv
-  cat("\t\tOverall p-val:", p_overall, "\n")
+  # For myo: compare days in scaffold P and compare scaffolds at day 0 and 21
+  perlog_results <- data.frame()
+  overall_results <- data.frame()
   
-  # 7. which groups are different due to which logratio pair? -> posthocs
-  group_contrast_results <- res$posthoc.groups$summary %>% as.data.frame()
-  group_contrast_results[, 'significant'] <- as.factor(if_else(group_contrast_results[,"Adj p-value"] <= 0.05, 1, 0))
-  logratio_significances <- res$posthoc.logratios$significance
-  
-  posthoc_frame <- as.data.frame(t(combn(cell_types, 2))) %>%
-    cross_join(data.frame(groupContrast = rownames(group_contrast_results)))
-  colnames(posthoc_frame) <- c("ct1", "ct2", "groupContrast")
-  posthoc_frame$lr_significance <- 0
-  
-  # build the data frame for logratio-pairs x groupContrasts
-  mat_num <- unclass(mat_processed)
-  for (groupContrast in rownames(group_contrast_results)) {
-    if (group_contrast_results[groupContrast, "Adj p-value"] > 0.05) next
-    rows <- posthoc_frame$groupContrast == groupContrast
-    ct1  <- posthoc_frame$ct1[rows]
-    ct2  <- posthoc_frame$ct2[rows]
-    
-    col_idx <- colnames(mat_processed)
-    i1 <- match(ct1, col_idx)
-    i2 <- match(ct2, col_idx)
-    
-    lo <- ifelse(i1 < i2, ct1, ct2)
-    hi <- ifelse(i1 < i2, ct2, ct1)
-    key <- paste0(lo, "/", hi)
-    flip <- ifelse(ct1 == lo, 1, -1) # names are sorted alphabetically in perlog
-    
-    dissimilarity <- res$disEl[groupContrast, key]
-    signum <- flip * sign(res$wts[groupContrast, key])
-    
-    # effect size: ct1/ct2 ratio between the two groups
-    group_k <- strsplit(groupContrast, " vs ")[[1]][1]
-    group_l <- strsplit(groupContrast, " vs ")[[1]][2]
-    
-    mean_fold_change <- mapply(function(type_a, type_b) {
-      lr      <- log(mat_num[, type_a] / mat_num[, type_b])
-      theta_k <- mean(lr[groups == group_k])
-      theta_l <- mean(lr[groups == group_l])
-      exp(theta_k - theta_l)
-    }, ct1, ct2)
-    
-    # since some composition values are replaced with a very tiny value in zero-replacement
-    # some cell-types can have exactly the same values in all the samples being compared as part of a group:
-    # This makes Welch's statistic undefined -> NA values
-    mask_significant <- mapply(function(a, b) logratio_significances[[groupContrast]][a, b], ct1, ct2)
-    posthoc_frame$lr_significance[rows] <- ifelse(!is.na(mask_significant) & mask_significant != 0, dissimilarity * signum, 0)
-    posthoc_frame$log2_mean_folg_change[rows] <- ifelse(!is.na(mask_significant) & mask_significant != 0, log2(mean_fold_change), NA_real_)
+  if (exp == "adipo") {
+    strata_props <- data.frame(filter_var = c("individual", "individual"),
+                               filter_val = c("F", "M"),
+                               group_var = c("day", "day"))
+  } else {
+    strata_props <- data.frame(filter_var = c("medium", "day", "day"),
+                               filter_val = c("P", "D0", "D21"),
+                               group_var = c("day", "medium", "medium"))
   }
-
-  # Heatmap of logratios x groupcontrast
-  var1 <- vars_of_interest[1]
-  var2 <- vars_of_interest[2]
-  gc_anno <- group_contrast_results %>%
-    rownames_to_column("groupContrast") %>%
-    separate_wider_delim(groupContrast, delim = " vs ", names = c("group1", "group2")) %>%
-    separate_wider_delim(group1, delim = "_", names = c(paste0(var1, "1"), paste0(var2, "1"))) %>%
-    separate_wider_delim(group2, delim = "_", names = c(paste0(var1, "2"), paste0(var2, "2"))) %>%
-    dplyr::select(matches(var1), matches(var2), significant) %>%
-    as.data.frame()
-  rownames(gc_anno) <- rownames(group_contrast_results)
-  gc_anno <- filter(gc_anno, significant == 1) %>% dplyr::select(-significant)
   
-  # adjust ComplexHeatmap column annotation
-  vals1 <- levels(droplevels(meta[[var1]]))
-  vals2 <- unique(meta[,var2])
+  # for each individual or scaffold:
+  for (i in 1:nrow(strata_props)) {
+    prop <- strata_props[i, ]
+    
+    idx <- meta[[prop$filter_var]] == prop$filter_val
+    mat_s <- mat_processed[idx, , drop = FALSE]
+    meta_s <- meta[idx, ]
+    groups_s <- as.character(droplevels(as.factor(meta_s[[prop$group_var]])))
+    
+    stratum_label <- paste0(prop$filter_var, "=", prop$filter_val)
+    
+    res_s <- tryCatch({
+      capture.output(
+        out <- perLog(mat_s, groups = groups_s,
+                      p = "auto", alpha = 0.05, R = 1000,
+                      posthoc.g = TRUE, posthoc.lr = TRUE, mAdj = "BH"),
+        file = nullfile()
+      )
+      out
+    }, error = function(e) {
+      cat("\tPERLOG non-significant for", stratum_label, ":", conditionMessage(e), "\n")
+      NULL
+    })
+    
+    if (is.null(res_s)) {
+      overall_results <- rbind(overall_results,
+                               data.frame(stratum = stratum_label, test_var = prop$group_var,
+                                          pvalOv = NA_real_, significant_overall = FALSE))
+      next
+    }
+    
+    overall_results <- rbind(overall_results,
+                             data.frame(stratum = stratum_label, test_var = prop$group_var,
+                                        pvalOv = res_s$pvalOv, significant_overall = res_s$pvalOv <= 0.05))
+    
+    cat("\tPERLOG done for", stratum_label, "(comparing", prop$group_var, ")\n")
+    
+    mat_num <- unclass(mat_s)
+    
+    # Save disEl + wts matrices in long format
+    disEl_df <- as.data.frame(as.table(res_s$disEl))
+    colnames(disEl_df) <- c("groupContrast", "pair", "disEl")
+    
+    wts_df <- as.data.frame(as.table(res_s$wts))
+    colnames(wts_df) <- c("groupContrast", "pair", "wts")
+    
+    df <- merge(disEl_df, wts_df, by = c("groupContrast", "pair"))
+    df$groupContrast <- as.character(df$groupContrast)
+    df$pair          <- as.character(df$pair)
+    
+    split_pair <- strsplit(df$pair, "/")
+    df$ct1 <- vapply(split_pair, `[`, character(1), 1)
+    df$ct2 <- vapply(split_pair, `[`, character(1), 2)
+    
+    # Group contrast adjusted p-values
+    group_summary  <- as.data.frame(res_s$posthoc.groups$summary)
+    df$group_pval  <- group_summary[df$groupContrast, "Adj p-value"]
+    
+    # logratio-level significance (0/1/-1)
+    df$lr_sig <- mapply(function(gc, a, b) {
+      sigmat <- res_s$posthoc.logratios$significance[[gc]]
+      if (is.null(sigmat)) return(NA_real_)
+      sigmat[a, b]
+    }, df$groupContrast, df$ct1, df$ct2)
+    
+    # fold change of ct1/ct2 ratio between the two groups in this contrast
+    df$fold_change <- mapply(function(gc, a, b) {
+      g_before <- strsplit(gc, " vs ")[[1]][1]
+      g_after <- strsplit(gc, " vs ")[[1]][2]
+      lr <- log(mat_num[, a] / mat_num[, b])
+      exp(mean(lr[groups_s == g_after]) - mean(lr[groups_s == g_before]))
+    }, df$groupContrast, df$ct1, df$ct2)
+    
+    df$stratum  <- stratum_label
+    df$test_var <- prop$group_var
+    
+    perlog_results <- rbind(perlog_results, df)
+  }
   
-  cols1 <- setNames(RColorBrewer::brewer.pal(max(length(vals1), 3), "Oranges")[seq_along(vals1)], vals1)
-  cols2 <- setNames(RColorBrewer::brewer.pal(max(length(vals2), 3), "Accent")[seq_along(vals2)], vals2)
+  # postprocessing 
+  perlog_results <- perlog_results %>%
+    mutate(
+      significant = !is.na(lr_sig) & lr_sig != 0 & group_pval <= 0.05,
+      fold_change = ifelse(significant, fold_change, NA_real_),
+      log2fc      = log2(fold_change)
+    )
   
-  col_list <- setNames(list(cols1, cols1, cols2, cols2),
-                       c(paste0(var1, "1"), paste0(var1, "2"), paste0(var2, "1"), paste0(var2, "2")))
-  ha <- HeatmapAnnotation(df = gc_anno, col = col_list,
-                          annotation_legend_param = setNames(
-                            list(list(title = var1, at = vals1),
-                                 list(title = var2)),
-                            c(paste0(var1, "2"),
-                              paste0(var2, "1"))
-                          ), # maps the name of the variable to the df and col
-                          show_legend = c(F, T, T, F))
+  # Plot the comparisons
+  # show also insignificant result but empty
+  #all_strata <- unique(overall_results$stratum)
+  #perlog_results$stratum <- factor(perlog_results$stratum, levels = all_strata)
+  # insig_df <- overall_results %>%
+  #   filter(!significant_overall) %>%
+  #   mutate(stratum = factor(stratum, levels = all_strata))
+  # following is to be able to control the panel width, by creating made-up values
+  # one real pair is required to avoid an empty y-value in the common y-axis 
+  # insig_anchor <- insig_df %>%
+  #   mutate(groupContrast = "", pair = unique(perlog_results$pair)[1])
   
-  # heatmap matrix
-  posthoc_frame <- posthoc_frame %>%
-    tidyr::unite("pair", ct1, ct2, sep = "/") %>%
-    pivot_wider(id_cols = "pair", names_from = groupContrast, values_from = log2_mean_folg_change) %>%
-    column_to_rownames("pair") %>%
-    as.matrix()
-  p_mat <- apply(posthoc_frame, 2, as.numeric)
-  rownames(p_mat) <- rownames(posthoc_frame)
+  ggplot() +
+    #geom_blank(data = insig_anchor, aes(x = groupContrast, y = pair)) +
+    #(if (nrow(insig_df) > 0) geom_rect(data = insig_df, aes(xmin=-Inf, xmax=Inf, ymin=-Inf, ymax=Inf), fill = "gray95")) +
+    geom_tile(data = perlog_results, aes(x = groupContrast, y = pair, fill = log2fc),
+              color = "gray40", linewidth = 0.5) +
+    facet_wrap(~ stratum, scales = "free_x", space = "free_x", drop = FALSE) +
+    scale_fill_gradient2(low = "firebrick", mid = "white", high = "steelblue",
+                         midpoint = 0, na.value = "grey60", name = "Log2FC") +
+    theme_bw() +
+    labs(x = "Group Contrast", y = "Cell-Type Pair") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
   
-  png(file.path("figures_posthoc", paste0(paste(exp, ref, method, "p_val", signif(p_overall, 3), sep = "_"), ".png")),
-      width = 720, height=720, res = 80)
-  draw(
-    Heatmap(p_mat[, rownames(gc_anno)], show_column_names = T, name = "log2(Mean Fold Change)",
-            cluster_columns=FALSE, cluster_rows=FALSE,
-            top_annotation=ha, col=circlize::colorRamp2(c(-max(abs(p_mat), na.rm=TRUE), 0, max(abs(p_mat), na.rm=TRUE)),
-                                              c("darkred", "white", "darkblue")),
-            show_heatmap_legend=T, rect_gp = gpar(col = "gray50", lwd = 0.5)),
-    merge_legends=TRUE
-  )
-  dev.off()
+  pval_summary <- paste(overall_results$stratum, signif(overall_results$pvalOv, 3),
+                        sep = "=", collapse = "_")
+  ggsave(filename = file.path("figures_posthoc", paste0(paste(exp, ref, method, pval_summary, sep = "_"), ".png")),
+    width = 9, height = 9, units = "in", dpi = 80)
   cat("\t\tPosthoc heatmap done.\n")
 }
 
