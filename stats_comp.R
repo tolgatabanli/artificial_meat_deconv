@@ -8,94 +8,178 @@ source("toolkit.R")
 source("read_compositions_and_metadata.R")
 
 
-# remove satellite cell experiment
-comp_myo_rectangle <- comp_myo_rectangle %>% filter(!grepl("Sat", sample_id))
-comp_myo_dwls <- comp_myo_dwls %>% filter(!grepl("Sat", sample_id))
+# Stats (ref x method)
+library(compositions)
+library(zCompositions)
+library(ComplexHeatmap)
 
-# PCA of the compositions
-clr <- clr(acomp(comp_myo_rectangle, parts = 2:12))
-rownames(clr) <- rownames(comp_myo_rectangle)
-pca          <- prcomp(clr, scale. = FALSE)
-var_exp      <- round(summary(pca)$importance[2, 1:2] * 100, 1)
+exps <- c("adipo", "myo")
+refs <- c("cattle", "messmer", "wang")
+methods <- c("dwls", "rectangle", "scaden")
 
-comp_myo_rectangle %>%
-  mutate(PC1 = pca$x[, 1],
-         PC2 = pca$x[, 2]) %>%
-  ggplot(aes(x = PC1, y = PC2, color = day)) +
-  geom_point(size = 3, alpha = 0.85) +
-  labs(x = paste0("PC1 (", var_exp[1], "%)"),
-       y = paste0("PC2 (", var_exp[2], "%)")) +
-  theme_minimal() +
-  theme(legend.position = "bottom")
-ggsave("images/pca_compositions_messmer_dwls.png", width = 8)
+# PERLOG inferential analysis
+run_perlog <- function(exp, ref, method) {
+  cat("Processing:", exp, ref, method)
+  # 1. choose matrix to analyze
+  mat <- new_mats[[exp]][[ref]][[method]]
 
-# take common cell types
-cell_types <- colnames(comp_myo_rectangle)[2:11]
-merged <- rbind(comp_myo_rectangle[, cell_types], comp_myo_dwls[, cell_types])
-merged_meta <- bind_rows(comp_myo_rectangle, comp_myo_dwls) %>% select(where(~all(!is.na(.)))) %>%
-  mutate(method = c(rep("rectangle", nrow(comp_myo_rectangle)), rep("dwls", nrow(comp_myo_dwls))))
+  meta <- if (exp == "adipo") raw_meta_adipo else raw_meta_myo
+  vars_of_interest <- if (exp == "adipo") c("day", "individual") else c("day", "medium")
 
-clr <- clr(acomp(merged))
-distance_matrix <- dist(clr)
-adonis2(distance_matrix ~ day + method, data = merged_meta, by = "margin")
-
-# test each day individually
-days <- droplevels(unique(merged_meta$day))
-
-# PERMANOVA per day
-pairwise_day <- lapply(days, function(d) {
-  idx  <- which(droplevels(merged_meta$day) == d)
-  if (length(unique(merged_meta$method[idx])) < 2) {
-    warning("Skipping ", d, " due to less than 2 methods.")
-    return(NULL)
+  meta <- as.data.frame(meta)
+  rownames(meta) <- meta$sample_id
+  mat <- mat[rownames(meta), ]
+  
+  # 2. Heatmap of raw proportions
+  ann <- meta[, vars_of_interest] %>%
+    mutate(across(all_of(vars_of_interest), as.factor))
+  pal_list <- lapply(vars_of_interest, function(v) {
+    vals <- levels(ann[[v]])
+    n <- max(length(vals), 3)
+    setNames(RColorBrewer::brewer.pal(n, "Accent")[seq_along(vals)], vals)
+  })
+  names(pal_list) <- vars_of_interest
+  pheatmap::pheatmap(mat, annotation_row = ann, annotation_colors = pal_list,
+                     filename = file.path("figures_heatmapRaw", paste0(paste(exp, ref, method, sep = "_"), ".png")))
+  cat("\tHeatmap of raw fracs done.\n")
+  
+  # 3. Part elimination and zero-replacement:
+  # Keep only parts that are present in at least 80% of the samples
+  # Replace remaining zeros by multiplicative replacement
+  keepParts <- colMeans(mat == 0) < 0.2
+  mat_processed <- mat[, keepParts]
+  cat("\tParts kept: ", colnames(mat_processed), "\n")
+  
+  if (any(mat_processed == 0)) {
+    mat_processed <- zCompositions::multRepl(mat_processed, label = 0, dl = rep(1e-5, ncol(mat_processed)))
   }
   
-  sub_dist <- as.dist(as.matrix(distance_matrix)[idx, idx])
-  sub_meta <- merged_meta[idx, ]
-  res <- adonis2(sub_dist ~ method, data = sub_meta, permutations = 999)
+  mat_processed <- acomp(mat_processed)
+  rownames(mat_processed) <- rownames(mat)
   
-  data.frame(day = d, F = res[1,"F"], R2 = res[1,"R2"], p = res[1,"Pr(>F)"])
-})
-
-do.call(rbind, Filter(Negate(is.null), pairwise_day))
-
-# wilcox per day
-clr_mat <- as.matrix(clr(acomp(merged)))
-
-pairwise_day <- lapply(days, function(d) {
-  idx      <- which(droplevels(merged_meta$day) == d)
+  cell_types <- colnames(mat_processed)
   
-  sub_clr  <- clr_mat[idx, ]
-  sub_meta <- merged_meta[idx, ]
-  rect_idx <- sub_meta$method == "rectangle"
+  # 6. PERLOG analysis
+  # day - individual for adipogenesis, day x medium for myogenesis
+  # For adipo: stratify by individual, test by day
+  # For myo: stratify by medium, test by day
+  groups <- apply(meta[, vars_of_interest], 1, paste, collapse = "_")
+  capture.output(res <- perLog(mat_processed,
+                          groups = groups,
+                          p = "auto", alpha = 0.05, R = 1000,
+                          posthoc.g = TRUE, posthoc.lr = TRUE, mAdj = "bonferroni"),
+                        file = nullfile())
+  cat("\tPERLOG done.\n")
+  p_overall <- res$pvalOv
+  cat("\t\tOverall p-val:", p_overall, "\n")
   
-  pvals <- apply(sub_clr, 2, function(x) {
-    wilcox.test(x[rect_idx], x[!rect_idx])$p.value
-  })
+  # 7. which groups are different due to which logratio pair? -> posthocs
+  group_contrast_results <- res$posthoc.groups$summary %>% as.data.frame()
+  group_contrast_results[, 'significant'] <- as.factor(if_else(group_contrast_results[,"Adj p-value"] <= 0.05, 1, 0))
+  logratio_significances <- res$posthoc.logratios$significance
   
-  data.frame(day = d, cell_type = cell_types, p = pvals,
-             p_adj = p.adjust(pvals, method = "BH"))
-})
+  posthoc_frame <- as.data.frame(t(combn(cell_types, 2))) %>%
+    cross_join(data.frame(groupContrast = rownames(group_contrast_results)))
+  colnames(posthoc_frame) <- c("ct1", "ct2", "groupContrast")
+  posthoc_frame$lr_significance <- 0
+  
+  # build the data frame for logratio-pairs x groupContrasts
+  mat_num <- unclass(mat_processed)
+  for (groupContrast in rownames(group_contrast_results)) {
+    if (group_contrast_results[groupContrast, "Adj p-value"] > 0.05) next
+    rows <- posthoc_frame$groupContrast == groupContrast
+    ct1  <- posthoc_frame$ct1[rows]
+    ct2  <- posthoc_frame$ct2[rows]
+    
+    col_idx <- colnames(mat_processed)
+    i1 <- match(ct1, col_idx)
+    i2 <- match(ct2, col_idx)
+    
+    lo <- ifelse(i1 < i2, ct1, ct2)
+    hi <- ifelse(i1 < i2, ct2, ct1)
+    key <- paste0(lo, "/", hi)
+    flip <- ifelse(ct1 == lo, 1, -1) # names are sorted alphabetically in perlog
+    
+    dissimilarity <- res$disEl[groupContrast, key]
+    signum <- flip * sign(res$wts[groupContrast, key])
+    
+    # effect size: ct1/ct2 ratio between the two groups
+    group_k <- strsplit(groupContrast, " vs ")[[1]][1]
+    group_l <- strsplit(groupContrast, " vs ")[[1]][2]
+    
+    mean_fold_change <- mapply(function(type_a, type_b) {
+      lr      <- log(mat_num[, type_a] / mat_num[, type_b])
+      theta_k <- mean(lr[groups == group_k])
+      theta_l <- mean(lr[groups == group_l])
+      exp(theta_k - theta_l)
+    }, ct1, ct2)
+    
+    # since some composition values are replaced with a very tiny value in zero-replacement
+    # some cell-types can have exactly the same values in all the samples being compared as part of a group:
+    # This makes Welch's statistic undefined -> NA values
+    mask_significant <- mapply(function(a, b) logratio_significances[[groupContrast]][a, b], ct1, ct2)
+    posthoc_frame$lr_significance[rows] <- ifelse(!is.na(mask_significant) & mask_significant != 0, dissimilarity * signum, 0)
+    posthoc_frame$log2_mean_folg_change[rows] <- ifelse(!is.na(mask_significant) & mask_significant != 0, log2(mean_fold_change), NA_real_)
+  }
 
-do.call(rbind, Filter(Negate(is.null), pairwise_day))
-
-# test with bootstrap samples, compare methods for each day
-
-# matrix has rows as samples
-bootstrap_matrix <- function(mat, size) {
-  row_indices <- sample(1:nrow(clr_mat), size = size, replace = TRUE)
-  return(clr_mat[row_indices,])
+  # Heatmap of logratios x groupcontrast
+  var1 <- vars_of_interest[1]
+  var2 <- vars_of_interest[2]
+  gc_anno <- group_contrast_results %>%
+    rownames_to_column("groupContrast") %>%
+    separate_wider_delim(groupContrast, delim = " vs ", names = c("group1", "group2")) %>%
+    separate_wider_delim(group1, delim = "_", names = c(paste0(var1, "1"), paste0(var2, "1"))) %>%
+    separate_wider_delim(group2, delim = "_", names = c(paste0(var1, "2"), paste0(var2, "2"))) %>%
+    dplyr::select(matches(var1), matches(var2), significant) %>%
+    as.data.frame()
+  rownames(gc_anno) <- rownames(group_contrast_results)
+  gc_anno <- filter(gc_anno, significant == 1) %>% dplyr::select(-significant)
+  
+  # adjust ComplexHeatmap column annotation
+  vals1 <- levels(droplevels(meta[[var1]]))
+  vals2 <- unique(meta[,var2])
+  
+  cols1 <- setNames(RColorBrewer::brewer.pal(max(length(vals1), 3), "Oranges")[seq_along(vals1)], vals1)
+  cols2 <- setNames(RColorBrewer::brewer.pal(max(length(vals2), 3), "Accent")[seq_along(vals2)], vals2)
+  
+  col_list <- setNames(list(cols1, cols1, cols2, cols2),
+                       c(paste0(var1, "1"), paste0(var1, "2"), paste0(var2, "1"), paste0(var2, "2")))
+  ha <- HeatmapAnnotation(df = gc_anno, col = col_list,
+                          annotation_legend_param = setNames(
+                            list(list(title = var1, at = vals1),
+                                 list(title = var2)),
+                            c(paste0(var1, "2"),
+                              paste0(var2, "1"))
+                          ), # maps the name of the variable to the df and col
+                          show_legend = c(F, T, T, F))
+  
+  # heatmap matrix
+  posthoc_frame <- posthoc_frame %>%
+    tidyr::unite("pair", ct1, ct2, sep = "/") %>%
+    pivot_wider(id_cols = "pair", names_from = groupContrast, values_from = log2_mean_folg_change) %>%
+    column_to_rownames("pair") %>%
+    as.matrix()
+  p_mat <- apply(posthoc_frame, 2, as.numeric)
+  rownames(p_mat) <- rownames(posthoc_frame)
+  
+  png(file.path("figures_posthoc", paste0(paste(exp, ref, method, "p_val", signif(p_overall, 3), sep = "_"), ".png")),
+      width = 720, height=720, res = 80)
+  draw(
+    Heatmap(p_mat[, rownames(gc_anno)], show_column_names = T, name = "log2(Mean Fold Change)",
+            cluster_columns=FALSE, cluster_rows=FALSE,
+            top_annotation=ha, col=circlize::colorRamp2(c(-max(abs(p_mat), na.rm=TRUE), 0, max(abs(p_mat), na.rm=TRUE)),
+                                              c("darkred", "white", "darkblue")),
+            show_heatmap_legend=T, rect_gp = gpar(col = "gray50", lwd = 0.5)),
+    merge_legends=TRUE
+  )
+  dev.off()
+  cat("\t\tPosthoc heatmap done.\n")
 }
 
-merged_meta$day <- droplevels(merged_meta$day)
-df <- data.frame()
-for (d in merged_meta$day) {
-  for (cell_type in cell_types) {
-    for (method in unique(merged_meta$method)) {
-      subsample <- clr[merged_meta$method == method & merged_meta$day == d, cell_type]
-      a_row <- sample(subsample, size = 100, replace = T)
-      sub_df <- data.frame(day = d, cell_type = cell_type, method = method, val = a_row)
-      df <- bind_rows(df, sub_df)
+for (exp in exps) {
+  for (ref in refs) {
+    for (method in methods) {
+      run_perlog(exp, ref, method)
     }
   }
   
