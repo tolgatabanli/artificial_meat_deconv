@@ -266,7 +266,7 @@ df_adipo_plot <- adipo_merged %>%
 sig_names  <- sort(setdiff(unique(df_adipo_plot$cell_type), "Other (< 5%)"))
 color_vals <- c(setNames(unname(pals::alphabet(length(sig_names))), sig_names),
                 "Other (< 5%)" = "gray70")
-color_vals["Unknown"] <- "white"
+color_vals["Unknown"] <- "gray90"
 
 p <- df_adipo_plot %>%
   ggplot(aes(x = sample_id, y = proportion, fill = cell_type)) +
