@@ -4,7 +4,7 @@ output: html_document
 date: "2026-05-19"
 ---
 
-```{r, fig.width = 10}
+```{r, fig.width = 30, fig.height = 40}
 library(Seurat)
 library(tidyverse)
 
@@ -29,14 +29,22 @@ DimPlot(cattle, group.by = "cell_lineage", pt.size = 0.1) +
 ggsave("figures/cattleatlas_umap_cell_lineage.png", width = 9, height = 8)
 
 # lineage-specific cell-type umaps
+library(patchwork)
+
+plot_list <- list()
 for (lineage in unique(cattle$cell_lineage)) {
-  new_colname <- paste0("types_in_", lineage)
-  cattle[[new_colname]] <- if_else(cattle$cell_lineage == lineage, cattle$cell_type, "others")
-  
-  DimPlot(cattle, group.by =new_colname, pt.size = 0.1) +
-    scale_color_hue(name = new_colname) + +
-  labs(title = "Cattle Atlas", x = "UMAP 1", y = "UMAP 2")
+  types_to_highlight <- unique(cattle@meta.data[cattle@meta.data$cell_lineage == lineage, "cell_type"])
+  cells_to_highlight <- lapply(types_to_highlight, function(ct) WhichCells(cattle, expression = cell_type == ct))
+  names(cells_to_highlight) <- stringr::str_wrap(types_to_highlight, width = 25) # remove "cells" for less visual clutter
+  cols <- colorRampPalette(pals::alphabet2())(length(types_to_highlight))
+
+  plot_list[[lineage]] <- DimPlot(cattle, group.by = "cell_type", pt.size = 0.1, cells.highlight = cells_to_highlight, label.size = 3, alpha = 0.7, cols.highlight = cols, na.value = "gray", sizes.highlight = 0.1) +
+    labs(title = lineage, x = "UMAP 1", y = "UMAP 2") +
+    theme(legend.text = element_text(size = 17))
 }
+wrap_plots(plot_list, ncol = 2)
+
+ggsave("figures/cattleatlas_distro_cell_types.png", width = 30, height = 40)
 ```
 
 ```{r, fig.width = 30, fig.height = 10}
