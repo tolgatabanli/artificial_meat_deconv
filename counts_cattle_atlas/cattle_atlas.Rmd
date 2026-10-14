@@ -26,7 +26,17 @@ DimPlot(cattle, group.by = "cell_lineage", pt.size = 0.1) +
   scale_color_manual(values = unname(pals::alphabet(n_distinct(cattle$cell_lineage))),
                      name = "Cell lineage") +
   labs(title = "Cattle Atlas", x = "UMAP 1", y = "UMAP 2")
-ggsave("figures/cattleatlas_umap_cell_lineage.png", width = 9)
+ggsave("figures/cattleatlas_umap_cell_lineage.png", width = 9, height = 8)
+
+# lineage-specific cell-type umaps
+for (lineage in unique(cattle$cell_lineage)) {
+  new_colname <- paste0("types_in_", lineage)
+  cattle[[new_colname]] <- if_else(cattle$cell_lineage == lineage, cattle$cell_type, "others")
+  
+  DimPlot(cattle, group.by =new_colname, pt.size = 0.1) +
+    scale_color_hue(name = new_colname) + +
+  labs(title = "Cattle Atlas", x = "UMAP 1", y = "UMAP 2")
+}
 ```
 
 ```{r, fig.width = 30, fig.height = 10}
