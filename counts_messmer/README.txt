@@ -13,7 +13,7 @@ counts_messmer/
 ├── Figures
 ├── messmer_signature.Rmd
 ├── messmer_umap_reproduce.Rmd
-├── preprocess.R                 #> Preprocessing script: a modified version of the original authors' script, adapted to retain Ensembl IDs
+├── preprocess.R                 #> Preprocessing script: a modified version of the original authors' script, adapted to retain Ensembl IDs; not available till permission resolved
 ├── rectangle_signature_inj1.py
 ├── rectangle_signature.py
 ├── Results                      #> Preprocessing results: RDS files for the different injections and MTX-format files for Injection 1; available in the Zenodo repository
