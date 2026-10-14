@@ -3,7 +3,17 @@ source("~/artifical_meat_deconv/toolkit.R")
 setwd("~/artifical_meat_deconv/")
 
 # Reading routine for composition matrices and sample metadata
-source("read_compositions_and_metadata.R")
+source("read_compositions_and_metadata.R") # -> comp_mats
+
+# Apply detection limit of 1e-5
+exps <- c("adipo", "myo")
+refs <- c("cattle", "messmer", "wang", "messmer_full")
+methods <- c("dwls", "rectangle", "scaden")
+
+new_mats <- rapply(comp_mats, function(mat){
+  mat[mat < 1e-5] <- 0
+  mat
+}, how = "replace")
 
 # input: name of the reference data set and experiment type
 # output: saves plot of barplot compositions
