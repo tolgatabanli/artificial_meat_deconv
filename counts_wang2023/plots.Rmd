@@ -1,0 +1,132 @@
+---
+title: "Wang 2023"
+output: html_document
+date: "2026-08-06"
+---
+
+```{r}
+library(tidyverse)
+source("~/artifical_meat_deconv/toolkit.R")
+setwd("~/artifical_meat_deconv/counts_wang2023/")
+```
+
+```{r}
+sc <- readRDS("wang_ids_mapped.RDS")
+
+table(paste0(sc$lables)) %>%
+  as.data.frame() %>%
+  dplyr::rename(cell_type = "Var1") %>%
+  ggplot(aes(x = cell_type, y = Freq)) +
+  geom_col(fill = "white", color = "gray") +
+  geom_text(aes(label = Freq), vjust = -0.3, color = "black", size=3) +
+  labs(x = "", y = "Count", title = "Wang2023") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0, size = 11),
+        panel.grid.major.x = element_blank(),
+        legend.position = "none")
+ggsave("figures/wang2023_cell_type_distro.png", height = 6)
+```
+
+```{r}
+set.seed(2026)
+sc <- NormalizeData(sc)
+sc <- FindVariableFeatures(sc)
+sc <- ScaleData(sc)
+sc <- RunPCA(sc)
+sc <- RunUMAP(sc, dims = 1:30)
+DimPlot(sc, group.by = "lables", pt.size = 0.1) +
+  scale_color_manual(values = unname(pals::alphabet(n_distinct(sc$lables))),
+                     name = "Cell type") +
+  labs(title = "Wang2023", x = "UMAP 1", y = "UMAP 2")
+ggsave("~/artifical_meat_deconv/counts_wang2023/figures/wang2023_umap.png", width = 12)
+```
+
+
+```{r}
+comp_adipo_dwls <- readRDS("sig_dwls/adipo_compositions_wang2023_dwls_signature.Rds")
+comp_adipo_rectangle <- read_csv("sig_rectangle/rectangle_estimations_adipo.csv") %>%
+  column_to_rownames("index") %>% as.matrix()
+comp_adipo_scaden <- readRDS("sig_scaden/adipo_compositions_wang2023_scaden.Rds")
+
+comp_myo_dwls <- readRDS("sig_dwls/myo_compositions_wang2023_dwls_signature.Rds")
+comp_myo_dwls <- comp_myo_dwls[rownames(comp_myo_dwls) != "", ]
+mode(comp_myo_dwls) <- "numeric"
+comp_myo_rectangle <- read_csv("sig_rectangle/rectangle_estimations_myo.csv") %>%
+  column_to_rownames("index") %>% as.matrix()
+rownames(comp_myo_rectangle) <- gsub(".*_", "", rownames(comp_myo_rectangle))
+comp_myo_scaden <- readRDS("sig_scaden/myo_compositions_wang2023_scaden.Rds")
+
+
+bulk_meta_adipo <- read_csv('/nfs/data2/huji_artificial_meat/adipogenesis/sample_sheet_cleaned.csv', col_names = T) %>%
+  janitor::clean_names()
+bulk_meta_myo <- read_csv('/nfs/data2/huji_artificial_meat/myogenesis/sample_sheet_cleaned.csv', col_names = T) %>%
+  janitor::clean_names()
+
+bulk_meta_adipo <- bulk_meta_adipo %>%
+  dplyr::select(library_name, sample_id, title, group, bio_replicate, individual, treatment, day) %>%
+  mutate(day = recode(day, "D3" = "D2")) %>%
+  mutate(day = factor(day, levels = c("D0", "D2", "D3", "D6", "D14")))
+bulk_meta_myo <- bulk_meta_myo %>%
+  dplyr::select(library_name, sample_id, group, day, bio_replicate, treatment) %>%
+  mutate(sample_id = gsub(".*_", "", sample_id)) %>%
+  mutate(day = factor(day, levels = c("d0", "d3", "d7", "d21")),
+         group = gsub("(?!Sat)D\\d*", "\\", group, perl = T)) %>%
+  separate_wider_delim(cols = group, delim = "_", names = c(NA, "group"), too_few = "align_end")
+
+# dwls rownames are canonical (come from actual bulk matrix)
+sxx_correct <- setNames(rownames(comp_myo_dwls), gsub(".*_", "", rownames(comp_myo_dwls)))
+# fix meta
+bulk_meta_myo$sample_id <- sxx_correct[gsub(".*_", "", bulk_meta_myo$sample_id)]
+# fix scaden (currently has meta's wrong names)
+rownames(comp_myo_scaden) <- sxx_correct[gsub(".*_", "", rownames(comp_myo_scaden))]
+```
+
+
+```{r, fig.width=15}
+adipo_merged <- merge_methods(comp_adipo_dwls, comp_adipo_rectangle, comp_adipo_scaden,
+                              meta = bulk_meta_adipo, method_names = c("dwls", "rectangle", "scaden"))
+
+color_vals <- pals::alphabet(length(adipo_merged$cell_type))
+names(color_vals) <- unique(adipo_merged$cell_type)
+color_vals["Unknown"] <- "white"
+
+p <- adipo_merged %>%
+  ggplot(aes(x = sample_id, y = proportion, fill = cell_type)) +
+  geom_col(linewidth = 0.8) +
+  coord_flip() +
+  facet_grid(day + individual ~ method, scales = "free_y", space = "free_y") +
+  scale_fill_manual(values = color_vals, name = "Cell type") +
+  theme_minimal() +
+  labs(y = "Proportion", x = NULL) +
+  theme(
+    strip.text.y.right = element_text(angle = 0, hjust = 0.5, face = "bold"),
+    strip.background.y = element_rect(fill = "gray90", color = "black", linewidth = 0.8),
+    panel.border       = element_rect(color = "gray70", fill = NA, linewidth = 0.4),
+    panel.spacing.y    = unit(0.3, "lines")
+  )
+p
+```
+
+```{r, fig.width=15}
+myo_merged <- merge_methods(comp_myo_dwls, comp_myo_rectangle, comp_myo_scaden, meta = bulk_meta_myo, method_names = c("dwls", "rectangle", "scaden"))
+
+sat_samples <- myo_merged %>% filter(group == "Sat")
+others <- myo_merged %>% filter(group != "Sat")
+
+p <- ggplot(others, aes(x = paste0(sample_id, "_", group), y = proportion, fill = cell_type)) +
+  geom_col() +
+  coord_flip() +
+  labs(x = "Sample", y = "Proportion") +
+  facet_grid(day ~ method, scales = "free_y") +
+  scale_fill_manual(values = color_vals, name = "Cell type") +
+  theme_minimal() + 
+  guides(fill = guide_legend(
+    ncol          = 1,
+    keyheight     = unit(1, "lines"),
+    keywidth      = unit(1, "lines"),
+    label.theme   = element_text(size = 8),
+    override.aes = list(shape = 16, size = 2)
+  ))
+p
+```
+
