@@ -219,37 +219,28 @@ run_perlog <- function(exp, ref, method) {
       log2fc = log2(fold_change)
     )
   
-  # Plot the comparisons
-  # show also insignificant result but empty
-  #all_strata <- unique(overall_results$stratum)
-  #perlog_results$stratum <- factor(perlog_results$stratum, levels = all_strata)
-  # insig_df <- overall_results %>%
-  #   filter(!significant_overall) %>%
-  #   mutate(stratum = factor(stratum, levels = all_strata))
-  # following is to be able to control the panel width, by creating made-up values
-  # one real pair is required to avoid an empty y-value in the common y-axis 
-  # insig_anchor <- insig_df %>%
-  #   mutate(groupContrast = "", pair = unique(perlog_results$pair)[1])
-  
-  ggplot() +
-    #geom_blank(data = insig_anchor, aes(x = groupContrast, y = pair)) +
-    #(if (nrow(insig_df) > 0) geom_rect(data = insig_df, aes(xmin=-Inf, xmax=Inf, ymin=-Inf, ymax=Inf), fill = "gray95")) +
-    geom_tile(data = perlog_results, aes(x = groupContrast, y = pair, fill = log2fc),
-              color = "gray40", linewidth = 0.5) +
-    facet_wrap(~ stratum, scales = "free_x", space = "free_x", drop = FALSE) +
-    scale_fill_gradient2(low = "firebrick", mid = "white", high = "steelblue",
-                         midpoint = 0, na.value = "grey60", name = "Log2FC") +
-    theme_bw() +
-    labs(x = "Group Contrast", y = "Cell-Type Pair") +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1))
-  
-  pval_summary <- paste(overall_results$stratum, signif(overall_results$pvalOv, 3),
-                        sep = "=", collapse = "_")
-  ggsave(filename = file.path("figures_posthoc", paste0(paste(exp, ref, method, pval_summary, sep = "_"), ".png")),
-    width = 9, height = 9, units = "in", dpi = 80)
-  cat("\t\tPosthoc heatmap done.\n")
+  # Plot the log-ratio vs group contrast
+  num_pairs <- length(cell_types)
+  if (nrow(perlog_results) > 0) {
+    ggplot() +
+      geom_tile(data = perlog_results, aes(x = groupContrast, y = pair, fill = log2fc),
+                color = "gray40", linewidth = 0.5) +
+      facet_wrap(~ stratum, scales = "free_x", space = "free_x", drop = FALSE) +
+      scale_fill_gradient2(low = "firebrick", mid = "white", high = "steelblue",
+                           midpoint = 0, na.value = "grey60", name = "Log2FC") +
+      theme_bw() +
+      labs(x = "Group Contrast", y = "Cell-Type Pair") +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+    
+    pval_summary <- paste(overall_results$stratum, signif(overall_results$pvalOv, 3),
+                          sep = "=", collapse = "_")
+    ggsave(filename = file.path("figures_posthoc", paste0(paste(exp, ref, method, pval_summary, sep = "_"), ".png")),
+           width = 2700, height = 200 * (num_pairs) * (num_pairs-1) / 2, units = "px", dpi = 300)
+  }
+  cat("\t\tPosthoc ggplot done.\n")
 }
 
+set.seed(2026)
 for (exp in exps) {
   for (ref in refs) {
     for (method in methods) {
