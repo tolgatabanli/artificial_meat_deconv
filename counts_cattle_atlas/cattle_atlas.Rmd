@@ -56,7 +56,24 @@ table(paste0(cattle$cell_type)) %>%
   theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0, size = 11),
         panel.grid.major.x = element_blank(),
         legend.position = "none")
-ggsave("distro_cell_types.png", width = 30, height = 10)
+ggsave("figures/cattleatlas_distro_cell_types.png", width = 30, height = 10)
+
+
+table(paste0(cattle$cell_lineage)) %>%
+  as.data.frame() %>%
+  dplyr::rename(cell_type = "Var1") %>%
+  mutate(cell_type = fct_relevel(cell_type, "Other", after = Inf)) %>%
+  ggplot(aes(x = cell_type, y = Freq)) +
+  geom_bar(stat = "identity") +
+  geom_col(fill = "white", color = "gray") +
+  #scale_y_log10() +
+  geom_text(aes(label = Freq), vjust = -0.3, color = "black", angle = 0) +
+  labs(x = "", y = "Count", title = "CattleAtlas") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0, size = 11),
+        panel.grid.major.x = element_blank(),
+        legend.position = "none")
+ggsave("figures/cattleatlas_distro_cell_lineages.png", width = 6, height = 5)
 ```
 
 # Cell Ontology Remapping
