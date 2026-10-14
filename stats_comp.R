@@ -11,20 +11,28 @@ new_mats <- rapply(comp_mats, function(m) { m[m < 1e-5] <- 0; m }, how ="replace
 # Stats (ref x method)
 library(compositions)
 library(zCompositions)
-library(ComplexHeatmap)
 
 exps <- c("adipo", "myo")
-refs <- c("cattle", "messmer", "wang", "messmer_full")
+refs <- c("cattle", "messmer", "wang")
 methods <- c("dwls", "rectangle", "scaden")
 
 # PERLOG inferential analysis
+all_overall_results <- data.frame()
+all_group_contrast_results <- data.frame(
+  exp = character(0), ref = character(0), method = character(0),
+  stratum = character(0), test_var = character(0),
+  groupContrast = character(0), group_pval = numeric(0),
+  significant = logical(0), contrast_label = character(0)
+)
+
+
 run_perlog <- function(exp, ref, method) {
   cat("Processing:", exp, ref, method)
   # 1. choose matrix to analyze
   mat <- new_mats[[exp]][[ref]][[method]]
 
   meta <- if (exp == "adipo") raw_meta_adipo else raw_meta_myo
-  vars_of_interest <- if (exp == "adipo") c("day", "individual") else c("day", "medium")
+  vars_of_interest <- if (exp == "adipo") c("day", "individual") else c("day", "scaffold")
 
   meta <- as.data.frame(meta)
   rownames(meta) <- meta$sample_id
@@ -59,11 +67,23 @@ run_perlog <- function(exp, ref, method) {
   
   cell_types <- colnames(mat_processed)
   
-  # 6. PERLOG analysis
-  # day - individual for adipogenesis, day x medium for myogenesis
+  # 4. PERLOG analysis
+  # day - individual for adipogenesis, day x scaffold for myogenesis
   # For adipo: stratify by individual, test by day
   # For myo: compare days in scaffold P and compare scaffolds at day 0 and 21
-  perlog_results <- data.frame()
+  perlog_results <- data.frame(
+    groupContrast = character(0),
+    pair          = character(0),
+    disEl         = numeric(0),
+    wts           = numeric(0),
+    ct1           = character(0),
+    ct2           = character(0),
+    group_pval    = numeric(0),
+    lr_sig        = numeric(0),
+    fold_change   = numeric(0),
+    stratum       = character(0),
+    test_var      = character(0)
+  )
   overall_results <- data.frame()
   
   if (exp == "adipo") {
@@ -71,9 +91,9 @@ run_perlog <- function(exp, ref, method) {
                                filter_val = c("F", "M"),
                                group_var = c("day", "day"))
   } else {
-    strata_props <- data.frame(filter_var = c("medium", "day", "day"),
-                               filter_val = c("P", "D0", "D21"),
-                               group_var = c("day", "medium", "medium"))
+    strata_props <- data.frame(filter_var = c("scaffold", "day", "day"),
+                               filter_val = c("P", "D00", "D21"),
+                               group_var = c("day", "scaffold", "scaffold"))
   }
   
   # for each individual or scaffold:
@@ -100,16 +120,46 @@ run_perlog <- function(exp, ref, method) {
       NULL
     })
     
+    # Save significant result
+    make_ns_row <- function() {
+      data.frame(exp = exp, ref = ref, method = method,
+                 stratum = stratum_label, test_var = prop$group_var,
+                 groupContrast = "NS", group_pval = NA_real_,
+                 significant = FALSE, contrast_label = "NS")
+    }
+    
     if (is.null(res_s)) {
       overall_results <- rbind(overall_results,
                                data.frame(stratum = stratum_label, test_var = prop$group_var,
                                           pvalOv = NA_real_, significant_overall = FALSE))
+      all_group_contrast_results <<- rbind(all_group_contrast_results,
+                                           make_ns_row())
       next
     }
     
     overall_results <- rbind(overall_results,
                              data.frame(stratum = stratum_label, test_var = prop$group_var,
                                         pvalOv = res_s$pvalOv, significant_overall = res_s$pvalOv <= 0.05))
+    
+    # Save to global contrast result:
+    group_summary <- as.data.frame(res_s$posthoc.groups$summary)
+    group_summary$groupContrast <- rownames(group_summary)
+    
+    sig_contrasts <- group_summary %>% filter(`Adj p-value` <= 0.05)
+    
+    group_contrast_results <- if (nrow(sig_contrasts) == 0) {
+      make_ns_row()
+    } else {
+      data.frame(
+        exp = exp, ref = ref, method = method,
+        stratum = stratum_label, test_var = prop$group_var,
+        groupContrast = sig_contrasts$groupContrast,
+        group_pval = sig_contrasts$`Adj p-value`,
+        significant = TRUE,
+        contrast_label = paste0(sub(".*=", "", stratum_label), ": ", sig_contrasts$groupContrast)
+      )
+    }
+    all_group_contrast_results <<- rbind(all_group_contrast_results, group_contrast_results)
     
     cat("\tPERLOG done for", stratum_label, "(comparing", prop$group_var, ")\n")
     
@@ -131,8 +181,8 @@ run_perlog <- function(exp, ref, method) {
     df$ct2 <- vapply(split_pair, `[`, character(1), 2)
     
     # Group contrast adjusted p-values
-    group_summary  <- as.data.frame(res_s$posthoc.groups$summary)
-    df$group_pval  <- group_summary[df$groupContrast, "Adj p-value"]
+    group_summary <- as.data.frame(res_s$posthoc.groups$summary)
+    df$group_pval <- group_summary[df$groupContrast, "Adj p-value"]
     
     # logratio-level significance (0/1/-1)
     df$lr_sig <- mapply(function(gc, a, b) {
@@ -155,12 +205,18 @@ run_perlog <- function(exp, ref, method) {
     perlog_results <- rbind(perlog_results, df)
   }
   
+  # save overall results to the global var to tabularize later
+  overall_results$exp    <- exp
+  overall_results$ref    <- ref
+  overall_results$method <- method
+  all_overall_results <<- rbind(all_overall_results, overall_results)
+  
   # postprocessing 
   perlog_results <- perlog_results %>%
     mutate(
       significant = !is.na(lr_sig) & lr_sig != 0 & group_pval <= 0.05,
       fold_change = ifelse(significant, fold_change, NA_real_),
-      log2fc      = log2(fold_change)
+      log2fc = log2(fold_change)
     )
   
   # Plot the comparisons
