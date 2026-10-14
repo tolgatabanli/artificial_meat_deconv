@@ -25,6 +25,15 @@ for (exp in exps) {
   }
 }
 
+# close rectangle estimates to 1 after unknown removal
+for (exp in exps) for (ref in refs) processed_intersected_mats[[exp]][[ref]][["rectangle"]] <- acomp(processed_intersected_mats[[exp]][[ref]][["rectangle"]])
+# for (exp in exps) for (ref in refs) print(rowSums(processed_intersected_mats[[exp]][[ref]][["rectangle"]]))
+
+# pretty labels for plots
+exp_labels <- c(adipo = "Adipogenesis", myo = "Myogenesis")
+ref_labels <- c(messmer = "Messmer2023", cattle = "CattleAtlas", wang = "Wang2023")
+method_labels <- c(dwls = "DWLS", rectangle = "Rectangle", scaden = "Scaden")
+
 # compare DWLS and Rectangle apart from Unknowns
 longer_df <- data.frame()
 for (exp in exps) for (ref in refs) {
