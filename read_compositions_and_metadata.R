@@ -28,14 +28,30 @@ wang_mapping <- c(
   "LEndoC" = "EndoC", "VEndoC" = "EndoC", "Non-VEndoC" = "EndoC",
   "B cell" = "Lymphoid", "CD3 T cell" = "Lymphoid", "CD4 T cell" = "Lymphoid", "CD8 T cell" = "Lymphoid", "Proliferating T cell" = "Lymphoid", "Natural killer cell" = "Lymphoid",
   "Slow myofiber" = "Myofiber", "Fast myofiber" = "Myofiber",
-  "Mo_Ma" = "Myeloid", "Tenocyte" = "Myeloid", "Neutrophil" = "Myeloid"
+  "Mo_Ma" = "Myeloid", "Neutrophil" = "Myeloid", "Tenocyte" = "Tenocyte"
 )
 converter_wang <- unique(data.frame(
   original = c(names(wang_mapping), "Unknown"),
   new_name = c(unname(wang_mapping), "Unknown")
 ))
 
-agg_to_lineage <- function(mat, converter) {
+# Messmer cell-type aggregation
+messmer_mapping <- c(
+  "Neutrophils" = "Myeloid", "Monocytes-MΦ" = "Myeloid",
+  "B-T-NK cells" = "B-T-NK cells",
+  "Tenocytes" = "FAPs", "FAPs" = "FAPs",
+  "VECs" = "VECs", "LECs" = "LECs",
+  "SCs" = "SCs",
+  "SMMCs" = "SMMCs",
+  "Myocytes" = "Myocytes",
+  "Glial cells" = "Glial cells"
+)
+converter_messmer <- unique(data.frame(
+  original = c(names(messmer_mapping), "Unknown"),
+  new_name = c(unname(messmer_mapping), "Unknown")
+))
+
+aggr_celltypes <- function(mat, converter) {
   mat <- as.matrix(mat)
   index_to_lineage <- match(colnames(mat), converter$original)
   colnames(mat) <- converter$new_name[index_to_lineage]
@@ -129,14 +145,16 @@ for (ref in names(comp_mats[["myo"]])) {
 
 # make consistent names in Messmer
 fix_colnames <- function(mat) {
-  renames <- c("Glial-cells" = "Glial cells", "Monocytes - M?" = "Monocytes-M\u03A6", "B-T-NK-cells" = "B-T-NK cells")
+  renames <- c("Glial-cells" = "Glial cells", "Monocytes - M?" = "Monocytes-M\u03A6", "B-T-NK-cells" = "B-T-NK cells", "Monocytes" = "Monocytes-M\u03A6")
   colnames(mat) <- dplyr::recode(colnames(mat), !!!renames)
   mat
 }
 
 # fix messmer cell type names
 for (exp in names(comp_mats)) comp_mats[[exp]]$messmer <- lapply(comp_mats[[exp]]$messmer, fix_colnames)
+for (exp in names(comp_mats)) comp_mats[[exp]]$messmer_full <- lapply(comp_mats[[exp]]$messmer_full, fix_colnames)
 
 # aggregate cattle cells to lineages
-for (exp in names(comp_mats)) comp_mats[[exp]]$cattle <- lapply(comp_mats[[exp]]$cattle, agg_to_lineage, converter = converter_lineage)
-for (exp in names(comp_mats)) comp_mats[[exp]]$wang <- lapply(comp_mats[[exp]]$wang, agg_to_lineage, converter = converter_wang)
+for (exp in names(comp_mats)) comp_mats[[exp]]$cattle <- lapply(comp_mats[[exp]]$cattle, aggr_celltypes, converter = converter_lineage)
+for (exp in names(comp_mats)) comp_mats[[exp]]$wang <- lapply(comp_mats[[exp]]$wang, aggr_celltypes, converter = converter_wang)
+#for (exp in names(comp_mats)) comp_mats[[exp]]$messmer_full <- lapply(comp_mats[[exp]]$messmer_full, aggr_celltypes, converter = converter_messmer)
