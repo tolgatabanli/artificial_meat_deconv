@@ -1,5 +1,4 @@
 library(compositions)
-library(vegan)
 library(tidyverse)
 setwd("~/artifical_meat_deconv/")
 source("toolkit.R")
