@@ -19,18 +19,7 @@ counts_messmer/
 ├── Results                      #> Preprocessing results: RDS files for the different injections and MTX-format files for Injection 1; available in the Zenodo repository
 ├── scaden.R
 ├── scaden_inj1.R
-├── sig_dwls
-├── sig_dwls_inj1
-├── sig_dwls_withTeno
-├── sig_dwls_withTeno_inj1
-├── sig_rectangle
-├── sig_rectangle_inj1
-├── sig_rectangle_withTeno
-├── sig_rectangle_withTeno_inj1
-├── sig_scaden
-├── sig_scaden_inj1
-├── sig_scaden_withTeno
-├── sig_scaden_withTeno_inj1
+├── sig_*                        ä> Signature files and fraction estimates; all available on Zenodo
 ├── submit_dwls_inj1.sh
 ├── submit_dwls.sh
 ├── submit_scaden.sh
