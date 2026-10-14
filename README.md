@@ -20,6 +20,7 @@ the same pattern:
 - sig_* folders -> available in the Zenodo repository, hold each method's output: the computed cell-type
   signature matrix plus the resulting fraction estimates.
 
+```
 artificial_meat_deconv
 ├── converter_lineage.csv              #> Maps 90 cell types in the sampled Cattle Atlas to cell lineages
 ├── counts_cattle_atlas                #> Cattle Atlas processing, visualisation, and deconvolution
@@ -35,3 +36,4 @@ artificial_meat_deconv
 ├── rectangle_environment.yml          #> Conda environment (Python packages) used for Rectangle
 ├── stats_comp.R                       #> Statistical analysis of compositions via log-ratios of cell types
 └── toolkit.R                          #> Utility script: TPM-reading routine, cross-method composition-matrix merge function, a patched MAST function with caching, and a parallel-DWLS deconvolution function
+```
