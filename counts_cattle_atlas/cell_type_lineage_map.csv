@@ -1,0 +1,147 @@
+cell_type,cell_lineage
+Plasma cells,Immune
+Erythroid cells,Immune
+NK T cells,Immune
+Nonclassical monocytes,Immune
+B cells,Immune
+NK cells,Immune
+Intermediate monocytes,Immune
+Mast cells,Immune
+Classical monocytes,Immune
+Macrophages,Immune
+Other immune cells,Immune
+Neutrophils,Immune
+Kupffer cells,Immune
+Microglia,Immune
+DCs,Immune
+Conventional DC type 1,Immune
+Conventional DC type 2,Immune
+Plasmacytoid DCs,Immune
+Migratory DCs,Immune
+Proliferative DCs,Immune
+T cells,Immune
+Proliferative T cells,Immune
+Double-negative T cells,Immune
+CD4+ T cells,Immune
+Proliferative CD4+ T cells,Immune
+CD8+ T cells,Immune
+Cytotoxic CD8+ T cells,Immune
+WC1- gdT cells,Immune
+WC1+ gdT cells,Immune
+Neurons,Nerve
+Excitatory neurons,Nerve
+Granule cells,Nerve
+GABAergic neurons,Nerve
+PVALB+ GABAergic neurons,Nerve
+RELN+ GABAergic neurons,Nerve
+VIP+ GABAergic neurons,Nerve
+SST+ GABAergic neurons,Nerve
+Glia-like nestin-expressing progenitors,Nerve
+Purkinje cells,Nerve
+Rod photoreceptor cells,Nerve
+Cone photoreceptor cells,Nerve
+Horizontal cells,Nerve
+Bipolar cells,Nerve
+Rod bipolar cells,Nerve
+Amacrine cells,Nerve
+Glial cells,Nerve
+Astrocytes,Nerve
+Oligodendrocyte precursor cells,Nerve
+Oligodendrocytes,Nerve
+Schwann cells,Nerve
+Müller glial cells,Nerve
+Myoepithelial cells,Epithelial
+Chromaffin cells,Epithelial
+Follicular cells,Epithelial
+Thyroid follicular cells,Epithelial
+Acinar cells,Epithelial
+alpha cells,Epithelial
+Hepatoblasts,Epithelial
+Hepatocytes,Epithelial
+Cholangiocytes,Epithelial
+Adrenocortical cells,Epithelial
+Keratinocytes,Epithelial
+Spinous cells,Epithelial
+Proliferative spinous cells,Epithelial
+Duct cells,Epithelial
+Chief cells,Epithelial
+Parietal cells,Epithelial
+Isthmus cells,Epithelial
+Intestinal stem cells,Epithelial
+Progenitor cells,Epithelial
+Ciliated cells,Epithelial
+Uninucleate trophoblast cells,Epithelial
+beta cells,Epithelial
+Enterocytes,Epithelial
+Melanocytes,Epithelial
+Sebocytes,Epithelial
+Granulosa cells,Epithelial
+Luminal cells,Epithelial
+Basal duct cells,Epithelial
+Circulating epithelial cells,Epithelial
+Proximal tubule cells,Epithelial
+Proliferative uninucleate trophoblast cells,Epithelial
+Binucleate trophoblast cells,Epithelial
+Basal cells,Epithelial
+Zona fasciculata cells,Epithelial
+Goblet cells,Epithelial
+Epithelial stem cells,Epithelial
+Other epithelial cells,Epithelial
+Podocytes,Epithelial
+Proliferative basal cells,Epithelial
+Pit cells,Epithelial
+Club cells,Epithelial
+Loop of Henle cells,Epithelial
+Distal convoluted tubule cells,Epithelial
+Alveolar epithelial type 1 cells,Epithelial
+Alveolar epithelial type 2 cells,Epithelial
+Granular cells,Epithelial
+Principal cells,Epithelial
+Type A intercalated cells,Epithelial
+Type B intercalated cells,Epithelial
+Mucous neck cells,Epithelial
+C7+ stromal cells,Stromal
+Stromal cells at capsule adventitia,Stromal
+Pericytes,Stromal
+Myofibroblasts,Stromal
+Stromal cells at intima of corpus uteri,Stromal
+Mesangial cells,Stromal
+Inner annulus fibrosus cells,Stromal
+Outer/inner annulus fibrosus cells,Stromal
+Stromal cells enriched for tumor necrosis factor signaling,Stromal
+Activated pancreatic stellate cells,Stromal
+Fibroblasts,Stromal
+Mesenchymal stem cells,Stromal
+Chondrocytes,Stromal
+Notochord cells,Stromal
+Nucleus pulposus cells,Stromal
+Outer annulus fibrosus cells,Stromal
+Differentiating spermatogonia,Germline
+Spermatids,Germline
+Spermatocytes,Germline
+Undifferentiated spermatogonia,Germline
+Other endothelial cells,Endothelial
+Blood vascular endothelial cells,Endothelial
+Lymphatic endothelial cells,Endothelial
+Liver sinusoidal endothelial cells,Endothelial
+Skeletal muscle cells,Muscle
+Smooth muscle cells,Muscle
+Cardiomyocytes,Muscle
+Theca externa cells,Muscle
+Proliferative cells,Other
+Unknown cells,Other
+Non-classical monocytes,Immune
+Conventional dendritic cells type 1,Immune
+Conventional dendritic cells type 2,Immune
+Plasmacytoid dendritic cells,Immune
+Double negative T cells,Immune
+WC1- γδT cells,Immune
+WC1+ γδT cells,Immune
+Glia cells,Nerve
+Muller glia cells,Nerve
+α cells,Epithelial
+β cells,Epithelial
+Loop of Henles cells,Epithelial
+Neuroendocrine cells,Epithelial
+Outer_inner annulus fibrosus cells,Stromal
+Stromal cells enriched for tumour necrosis factor signalling,Stromal
