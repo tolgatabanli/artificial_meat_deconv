@@ -97,14 +97,12 @@ for (exp in exps) {
       m1 <- m_comb[1, i]
       m2 <- m_comb[2, i]
       cat("\t\tPair: ", m1, " vs ", m2, "\n")
-      # raw proportions (> replacement value)
       mat1 <- mats[[m1]]
       mat2 <- mats[[m2]]
       merged <- merge_methods(mat1, mat2, meta = meta, method_names = c(m1, m2)) %>%
-        pivot_wider(names_from = method, values_from = proportion) %>%
-        filter(.data[[m1]] > 1e-5 | .data[[m2]] > 1e-5)
+        pivot_wider(names_from = method, values_from = proportion)
       
-      r_val <- cor(merged[[m1]], merged[[m2]], method = "spearman")
+      r_val <- cor(merged[[m1]], merged[[m2]], method = "pearson")
       rmse_val <- sqrt(mean((merged[[m1]] - merged[[m2]])^2))
       r_vals <- c(r_vals, r_val)
       rmse_vals <- c(rmse_vals, rmse_val)
@@ -136,4 +134,5 @@ ggplot(aes(x = ref, y = pair, size = r, color = rmse)) +
   labs(x = "Reference Dataset", y = "Method Pairs") +
   theme_minimal() +
   theme(strip.text.x = element_text(size = 12))
+ggsave("figures_agreement/pairwise_method_rmse_peason.png", width = 11)
 
