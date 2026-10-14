@@ -53,6 +53,7 @@ for (exp in exps) for (ref in refs) {
 # for current script variables.
 summary_df <- longer_df %>%
   pivot_wider(names_from = method, values_from = proportion) %>%
+  filter(dwls > 1e-5 | rectangle > 1e-5) %>%
   group_by(exp, ref) %>%
   summarise(r = cor(dwls, rectangle, use = "complete.obs"),
             rmse = sqrt(mean((dwls - rectangle)^2, na.rm = TRUE)),
@@ -60,6 +61,7 @@ summary_df <- longer_df %>%
 
 longer_df %>%
   pivot_wider(names_from = method, values_from = proportion) %>%
+  filter(dwls > 1e-5 | rectangle > 1e-5) %>%
   ggplot(aes(x = dwls, y = rectangle)) +
   geom_point(size = 1.2, color = "lightblue4") +
   geom_smooth(method = "lm", color = "black", linewidth = 0.6, se = F) +
@@ -100,7 +102,8 @@ for (exp in exps) {
       mat1 <- mats[[m1]]
       mat2 <- mats[[m2]]
       merged <- merge_methods(mat1, mat2, meta = meta, method_names = c(m1, m2)) %>%
-        pivot_wider(names_from = method, values_from = proportion)
+        pivot_wider(names_from = method, values_from = proportion) %>%
+        filter(.data[[m1]] > 1e-5 | .data[[m2]] > 1e-5)
       
       r_val <- cor(merged[[m1]], merged[[m2]], method = "pearson")
       rmse_val <- sqrt(mean((merged[[m1]] - merged[[m2]])^2))
