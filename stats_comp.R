@@ -248,54 +248,105 @@ for (exp in exps) {
     }
   }
 }
-cat("IT RAN THROUGH")
 
+# p adjust for group contrasts
+all_group_contrast_results <- all_group_contrast_results %>%
+  group_by(exp, ref, method) %>%
+  mutate(group_pval_adj = p.adjust(group_pval, method = "BH")) %>%
+  ungroup()
 
-### backup
-# 5. make geometric mean barplots
-cell_types <- colnames(mat_processed)
-p <- clr(mat_processed) %>% as.data.frame() %>%
-  rownames_to_column("sample_id") %>%
-  inner_join(meta, by = "sample_id") %>%
-  pivot_longer(cols = all_of(cell_types), names_to = "cell_type", values_to = "clr") %>%
-  group_by(across(all_of(c(vars_of_interest, "cell_type")))) %>%
-  summarise(clr_mean = mean(clr), .groups = "drop") %>%
-  ggplot(aes(x = day, y = clr_mean)) +
-  geom_col() +
-  facet_grid(as.formula(paste(vars_of_interest[2], "~ cell_type")), scales = "free_x") +
-  theme_bw() +
-  labs(title = "", x = "Cell Type", y = "Mean CLR")
-ggsave(file.path("figures_geometricMean", paste0(paste(exp, ref, method, sep = "_"), ".png")), p)
-cat("\tGeometric mean barplots done.\n")
+all_group_contrast_results$significant <- all_group_contrast_results$group_pval_adj < 0.05
 
+# Write the formatted latex table for group contrast for all ref-method combis
+library(kableExtra)
 
-
-names_of_groups <- rownames(group_contrast_results)
-split_pairs <- strsplit(names_of_groups, split = " vs ")
-
-external_groups <- unique(unlist(split_pairs))
-group_signif_matrix <- matrix(0, nrow = length(external_groups), ncol = length(external_groups))
-rownames(group_signif_matrix) <- external_groups
-colnames(group_signif_matrix) <- external_groups
-for (i in 1:nrow(group_contrast_results)) {
-  if (group_contrast_results[i, "Adj p-value"] > 0.05) next
-  pair <- split_pairs[[i]]
-  group_signif_matrix[pair[1], pair[2]] <- 1 #group_contrast_results[i, "Adj p-value"]
-  group_signif_matrix[pair[2], pair[1]] <- 1
+format_pval <- function(p) {
+  dplyr::case_when(
+    is.na(p)   ~ "NS",
+    p < 0.001  ~ "***",
+    p < 0.01   ~ "**",
+    p < 0.05   ~ "*",
+    TRUE       ~ "ns"
+  )
 }
 
-# red is significant
-pheatmap::pheatmap(group_signif_matrix, display_numbers = F, cluster_rows = F, cluster_cols = F, legend = F)
-ggsave(file.path(fig_path, paste0("heatmap_group_contrast_", fig_suffix, ".png")))
+ref_labels <- c(messmer = "Messmer2023", wang = "Wang2023", cattle = "CattleAtlas")
+method_labels <- c(dwls = "DWLS", rectangle = "Rectangle", scaden = "Scaden")
 
+# following function is modified from an AI-generated code
+build_contrast_table <- function(df, exp_name) {
+  exp_label <- if (exp_name == "adipo") "Adipogenesis" else "Myogenesis"
+  
+  df_exp <- df %>%
+    filter(exp == exp_name) %>%
+    mutate(short_stratum = sub(".*=", "", stratum),
+           col_key       = paste(ref_labels[ref], method_labels[method], sep = "__"))
+  
+  col_combos <- expand.grid(method_label = unname(method_labels),
+                            ref_label    = unname(ref_labels),
+                            stringsAsFactors = FALSE) %>%
+    mutate(col_key = paste(ref_label, method_label, sep = "__"))
+  ck <- col_combos$col_key
+  
+  all_strata <- unique(df_exp$short_stratum)
+  
+  # combos whose overall stratum test failed entirely
+  ns_combos <- df_exp %>%
+    filter(groupContrast == "NS") %>%
+    distinct(short_stratum, col_key)
+  
+  # one summary row per stratum: label = stratum name, NS under failed columns
+  overall_df <- lapply(all_strata, function(s) {
+    failed <- ns_combos$col_key[ns_combos$short_stratum == s]
+    as.data.frame(c(list(short_stratum = s, groupContrast = s),
+                    setNames(as.list(ifelse(ck %in% failed, "NS", "")), ck)),
+                  stringsAsFactors = FALSE)
+  }) %>% bind_rows()
+  
+  # real contrast rows; contrast not significant for a ref/method -> "NS"
+  real_df <- df_exp %>%
+    filter(groupContrast != "NS") %>%
+    mutate(cell_value = format_pval(group_pval)) %>%
+    distinct(short_stratum, groupContrast, col_key, .keep_all = TRUE) %>%
+    pivot_wider(id_cols = c(short_stratum, groupContrast),
+                names_from = col_key, values_from = cell_value,
+                values_fill = "NS")
+  real_df[setdiff(ck, colnames(real_df))] <- "NS"
+  
+  # blank failed columns in real rows (NS already shown in summary row)
+  for (i in seq_len(nrow(ns_combos))) {
+    real_df[real_df$short_stratum == ns_combos$short_stratum[i],
+            ns_combos$col_key[i]] <- ""
+  }
+  
+  wide <- bind_rows(overall_df, real_df) %>%
+    select(short_stratum, groupContrast, all_of(ck)) %>%
+    arrange(short_stratum, groupContrast != short_stratum, groupContrast)
+  
+  group_lengths    <- rle(wide$short_stratum)$lengths
+  group_start_rows <- cumsum(group_lengths) - group_lengths + 1
+  hline_rows       <- head(cumsum(group_lengths), -1)
+  
+  header_counts <- setNames(rep(length(method_labels), length(ref_labels)),
+                            unname(ref_labels))
+  
+  kbl(select(wide, -short_stratum),
+      format = "latex", booktabs = TRUE,
+      col.names = c("\\shortstack{Group\\\\Contrast}",
+                    paste0("\\rotatebox[origin=c]{90}{\\makebox[1.6cm][l]{",
+                           col_combos$method_label, "}}")),
+      escape = FALSE,
+      caption = paste0("Significant PERLOG group contrasts | ", exp_label,
+                       ". * $p<0.05$, ** $p<0.01$, *** $p<0.001$. ",
+                       "NS: not significant. p-values are corrected for multiple testing experiment-wise using the Benjamini-Hochberg procedure.")) %>%
+    add_header_above(c(" " = 1, header_counts)) %>%
+    kable_styling(latex_options = "hold_position") %>%
+    row_spec(group_start_rows, bold = TRUE) %>%
+    row_spec(hline_rows, hline_after = TRUE)
+}
 
-
-
-
-
-# 8. which logratios drive the differences?
-# considers significant group contrasts and make a boxplot
-lapply(, function(x) pheatmap::pheatmap(x))
+build_contrast_table(all_group_contrast_results, "adipo")
+build_contrast_table(all_group_contrast_results, "myo")
 
 # 
 plot.princomp.acomp(princomp.acomp(mat_processed))
