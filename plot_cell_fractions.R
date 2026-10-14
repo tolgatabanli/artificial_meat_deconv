@@ -20,6 +20,7 @@ new_mats <- rapply(comp_mats, function(mat){
 plot_method_comparison <- function(ref, exp, meta, facet_formula, outdir = "figures_fractions", width = 9, height = 10) {
   mats <- new_mats[[exp]][[ref]]
   
+  if (exp == "myo") meta <- mutate(meta, scaffold = factor(scaffold, levels = c("P", "S", "mS", "sS")))
   merged <- merge_methods(mats[["rectangle"]], mats[["dwls"]], mats[["scaden"]],
                           meta = meta, method_names = c("Rectangle", "DWLS", "Scaden"))
   
