@@ -6,7 +6,7 @@ counts_wang2023/
 ├── plots.Rmd                 #> For cell-type abundance and UMAP plots
 ├── rectangle_signature.py
 ├── scaden.R
-├── sig_dwls
+├── sig_dwls                  #> sig_* folders contain signatures and fraction estimates; available on the Zenodo repo
 ├── sig_rectangle
 ├── sig_scaden
 ├── submit_dwls.sh
