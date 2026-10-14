@@ -96,7 +96,7 @@ plot_day_composition <- function(ref, exp, method, meta, cell_types,
   else
     facet_grid(reformulate("cell_type", response = paste(facet_var, collapse = "+")))
   
-  p <- comp_mats[[exp]][[ref]][[method]] %>%
+  p <- new_mats[[exp]][[ref]][[method]] %>%
     as.data.frame() %>%
     rownames_to_column("sample_id") %>%
     inner_join(meta, by = "sample_id") %>%
@@ -123,12 +123,12 @@ lineage_props_df <- lineage_props %>% data.frame() %>% rename(lineage = Var1, li
 
 bind_rows(
   lineage_props_df %>%
-    inner_join(data.frame(mean_prop = colMeans(comp_mats[["adipo"]][["cattle"]][["scaden"]]),
-                          lineage = names(colMeans(comp_mats[["adipo"]][["cattle"]][["scaden"]]))), by = "lineage") %>%
+    inner_join(data.frame(mean_prop = colMeans(new_mats[["adipo"]][["cattle"]][["scaden"]]),
+                          lineage = names(colMeans(new_mats[["adipo"]][["cattle"]][["scaden"]]))), by = "lineage") %>%
     mutate(exp = "Adipogenesis"),
   lineage_props_df %>%
-    inner_join(data.frame(mean_prop = colMeans(comp_mats[["myo"]][["cattle"]][["scaden"]]),
-                          lineage = names(colMeans(comp_mats[["myo"]][["cattle"]][["scaden"]]))), by = "lineage") %>%
+    inner_join(data.frame(mean_prop = colMeans(new_mats[["myo"]][["cattle"]][["scaden"]]),
+                          lineage = names(colMeans(new_mats[["myo"]][["cattle"]][["scaden"]]))), by = "lineage") %>%
     mutate(exp = "Myogenesis")) %>%
   ggplot(aes(x = lineage_props, y = mean_prop, color = exp, label = lineage)) +
   geom_point(size = 2.5) +
@@ -214,7 +214,3 @@ all_df %>% filter(frac > 0) %>% ggplot(aes(x = frac, fill = ref)) +
         legend.position = "bottom")
 
 ggsave("figures_fractions/raw_estimate_distribution.png", width = 10, height = 6)
-
-
-  #geom_col(data = zero_counts, aes(x = x_zero_pos, y = n_zeros, fill = ref), position = "identity", alpha = 0.7, inherit.aes = FALSE) +
-  
