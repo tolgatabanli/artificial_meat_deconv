@@ -1,8 +1,8 @@
 library(compositions)
-library(vegan)
 library(tidyverse)
 setwd("~/artifical_meat_deconv/")
 source("toolkit.R")
+suppressMessages(conflicted::conflict_prefer_all("dplyr"))
 
 # Reading routine for composition matrices and sample metadata
 source("read_compositions_and_metadata.R")
