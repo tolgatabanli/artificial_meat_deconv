@@ -15,9 +15,9 @@ the same pattern:
 - Method scripts (dwls.R, rectangle_signature.py, scaden.R) run the
   corresponding deconvolution method (DWLS, Rectangle, Scaden) against the
   bulk RNA-seq samples, using that dataset's prepared single-cell reference.
-- submit_*.sh — SLURM batch scripts that submit the matching method script
+- submit_*.sh -> SLURM batch scripts that submit the matching method script
   as a cluster job.
-- sig_* folders — hold each method's output: the computed cell-type
+- sig_* folders -> available in the Zenodo repository, hold each method's output: the computed cell-type
   signature matrix plus the resulting fraction estimates.
 
 artificial_meat_deconv
