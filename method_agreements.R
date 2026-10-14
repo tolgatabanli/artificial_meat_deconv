@@ -9,28 +9,12 @@ source("read_compositions_and_metadata.R")
 new_mats <- rapply(comp_mats, function(m) { m[m < 1e-5] <- 0; m }, how ="replace")
 
 exps <- c("adipo", "myo")
-refs <- c("cattle", "wang", "messmer_full") # messmer
+refs <- c("cattle", "wang", "messmer") 
 methods <- c("dwls", "rectangle", "scaden")
 m_comb <- combn(methods, 2)
 
 # START
-process_mat <- function(mat) {
-  mat <- acomp(mat)
-  keepParts <- colMeans(mat == 0) < 0.2
-  mat_processed <- mat#[, keepParts]
-  cat("\tParts kept: ", colnames(mat_processed), "\n")
-  
-  if (any(mat_processed == 0)) {
-    cat("\t\tMult. repl. applied.\n")
-    mat_processed <- zCompositions::multRepl(mat_processed, label = 0, dl = rep(1e-5, ncol(mat_processed)))
-  }
-  
-  mat_processed <- acomp(mat_processed)
-  rownames(mat_processed) <- rownames(mat)
-  
-  return(mat_processed)
-}
-processed_mats <- rapply(new_mats, process_mat, how = "replace")
+processed_mats <- new_mats #rapply(new_mats, process_mat, how = "replace")
 
 processed_intersected_mats <- processed_mats
 for (exp in exps) {
