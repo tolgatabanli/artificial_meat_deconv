@@ -1,0 +1,107 @@
+
+
+```{r}
+library(Seurat)
+library(sctransform)
+library(tidyverse)
+```
+
+```{r}
+counts <- data.table::fread('/nfs/data2/huji_artificial_meat/deconvolution_data/external_sc_references/messmer2023_GSE211428/GSE211428_counts.tsv.gz')
+mat <- as.matrix(counts[, -1])
+rownames(mat) <- counts$V1
+
+col_meta <- data.table::fread('/nfs/data2/huji_artificial_meat/deconvolution_data/external_sc_references/messmer2023_GSE211428/GSE211428_combined_meta.tsv.gz')
+col_meta <- as.data.frame(col_meta)
+rownames(col_meta) <- gsub("^(.*)\\.([0-9]+)_([0-9]+)$", "Inj\\3_\\1-\\2", col_meta$Unique_barcode)
+col_meta$V1 <- NULL
+
+# make the names path-compatible, since DWLS creates dirs
+col_meta$predicted.pheno <- gsub("/", "-", col_meta$predicted.pheno)
+gc()
+
+cat("colnames(mat):", length(colnames(mat)), "\n")
+cat("col_meta barcodes:", nrow(col_meta), "\n")
+cat("Intersection:", length(intersect(colnames(mat), rownames(col_meta))), "\n")
+cat("In mat not in col_meta:", length(setdiff(colnames(mat), rownames(col_meta))), "\n")
+cat("In col_meta not in mat:", length(setdiff(rownames(col_meta), colnames(mat))), "\n")
+
+common <- intersect(colnames(mat), rownames(col_meta))
+mat <- mat[, common]
+col_meta <- col_meta[common, ]
+
+# Use injection 1
+messmer_inj1 <- readRDS("~/artifical_meat_deconv/messmer_counts/Results/Inj1.Rds")
+mat <- GetAssayData(messmer_inj1, assay = "RNA", layer = "counts")
+mat <- as.matrix(mat)
+
+col_meta <- data.table::fread('/nfs/data2/huji_artificial_meat/deconvolution_data/external_sc_references/messmer2023_GSE211428/GSE211428_combined_meta.tsv.gz')
+col_meta <- as.data.frame(col_meta) %>%
+  filter(orig.ident == "Injection1") %>%
+  mutate(Unique_barcode = gsub("\\.1_1$", "-1", Unique_barcode)) %>%
+  column_to_rownames("Unique_barcode")
+# make the names path-compatible, since DWLS creates dirs
+col_meta$predicted.pheno <- gsub("/", "-", col_meta$predicted.pheno)
+
+cat("colnames(mat):", length(colnames(mat)), "\n")
+cat("col_meta barcodes:", nrow(col_meta), "\n")
+cat("Intersection:", length(intersect(colnames(mat), rownames(col_meta))), "\n")
+cat("In mat not in col_meta:", length(setdiff(colnames(mat), rownames(col_meta))), "\n")
+cat("In col_meta not in mat:", length(setdiff(rownames(col_meta), colnames(mat))), "\n")
+
+common <- intersect(colnames(mat), rownames(col_meta))
+mat <- mat[, common]
+col_meta <- col_meta[common, ]
+
+gc()
+
+messmer2023 <- CreateSeuratObject(counts = mat, meta.data = col_meta)
+```
+
+```{r}
+renames <- c("Glial-cells" = "Glial cells",
+             "Monocytes - M?" = "Monocytes-M\u03A6",
+             "B-T-NK-cells" = "B-T-NK cells",
+             "Monocytes" = "Monocytes-M\u03A6")
+
+messmer2023$predicted.pheno <- dplyr::recode(messmer2023$predicted.pheno, !!!renames)
+unique(messmer2023$predicted.pheno)
+```
+
+
+```{r}
+options(future.globals.maxSize = 8 * 1024^3)
+
+#filtered <- messmer2023[,messmer2023$predicted.pheno != "Tenocytes"]
+seurat_obj <- SCTransform(
+  messmer2023,
+  vars.to.regress = c("percent.mt", "nCount_RNA", "nFeature_RNA", "S.Score", "G2M.Score"),
+  verbose = TRUE,
+  variable.features.n = 3000,
+  vst.flavor = "v2", # set for when matrixStats package errs
+)
+
+seurat_obj <- RunPCA(seurat_obj, verbose = FALSE)
+
+set.seed(2023)
+seurat_obj <- RunUMAP(seurat_obj, dims = 1:30, verbose = T, n.neighbors = 50, min.dist = 0.1)
+seurat_obj$predicted.pheno <- recode(seurat_obj$predicted.pheno, "Monocytes - M?" = "Monocytes / MΦ")
+DimPlot(seurat_obj, label = F, group.by = "predicted.pheno", pt.size = 0.2) +
+  scale_color_manual(values = unname(pals::alphabet(n_distinct(seurat_obj$predicted.pheno))),
+                     name = "Cell type") +
+  labs(title = "Messmer2023", x = "UMAP 1", y = "UMAP 2")
+ggsave(filename = "Figures/messmer2023_regenerated_umap_full.png",
+       width = 9, height = 8, dpi = 300)
+
+# with ellipses around injections
+umap_df <- Embeddings(seurat_obj, "umap") %>% as.data.frame()
+umap_df$orig.ident <- seurat_obj$orig.ident
+
+DimPlot(seurat_obj, label = T, group.by = "predicted.pheno", repel = T, pt.size = 0.1) +
+  scale_color_manual(values = unname(pals::alphabet(15)), name = "Cell type") +
+  labs(title = "Messmer2023", x = "UMAP 1", y = "UMAP 2") +
+  ggnewscale::new_scale_color() +
+  stat_ellipse(data = umap_df, aes(x = umap_1, y = umap_2, group = orig.ident, color = orig.ident),
+               inherit.aes = FALSE, linewidth = 0.5)
+```
+
