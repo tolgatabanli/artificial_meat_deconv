@@ -75,48 +75,6 @@ plot_method_comparison("wang", "myo",
                        meta = raw_meta_myo,
                        facet_formula = scaffold + day ~ method, width = 12, height = 5)
 
-# Cell-type-wise raw proportions of selected cell-types across days
-messmerCellTypes <- c("FAPs", "SCs", "SMMCs", "Myocytes")
-cattleCellTypes <- c("Stromal", "Muscle", "Epithelial")
-wangCellTypes <- c("FAP-1", "FAP-2", "Fast myofiber", "SC", "Tenocyte")
-
-plot_day_composition <- function(ref, exp, method, meta, cell_types,
-                                 group_var = "day", facet_var = NULL,
-                                 outdir = "figures_frac_celltype_wise") {
-  day_labels <- meta %>%
-    count(.data[[group_var]]) %>%
-    mutate(label = paste0(.data[[group_var]], " (n=", n, ")")) %>%
-    dplyr::select(all_of(group_var), label) %>%
-    deframe()
-  
-  facet <- if (is.null(facet_var))
-    facet_wrap(~ cell_type, nrow = 1)
-  else if (length(facet_var) == 1)
-    facet_grid(rows = vars(.data[[facet_var]]), cols = vars(cell_type))
-  else
-    facet_grid(reformulate("cell_type", response = paste(facet_var, collapse = "+")))
-  
-  p <- new_mats[[exp]][[ref]][[method]] %>%
-    as.data.frame() %>%
-    rownames_to_column("sample_id") %>%
-    inner_join(meta, by = "sample_id") %>%
-    dplyr::select(sample_id, all_of(group_var), any_of(facet_var), all_of(cell_types)) %>%
-    pivot_longer(all_of(cell_types), names_to = "cell_type", values_to = "frac") %>%
-    ggplot(aes(x = .data[[group_var]], y = frac)) +
-    geom_boxplot(outlier.shape = NA) +
-    geom_jitter(width = 0.2, height = 0, alpha = 0.6, size = 1.5) +
-    facet + theme_bw()
-  
-  ggsave(file.path(outdir, paste0(ref, "_", exp, "_", method, "_day_composition.png")), plot = p, height = 8)
-  invisible(p)
-}
-
-for (exp in c("myo", "adipo")) {
-  meta <- if (exp == "myo") raw_meta_myo else raw_meta_adipo
-  for (method in c("dwls", "rectangle", "scaden"))
-    plot_day_composition("messmer", exp, method, meta, messmerCellTypes, facet_var = c("individual"))
-}
-
 ### Check Scaden issue in cattle - Scaden estimate correlations with lineage
 lineage_props <- table(cattle$cell_lineage) / sum(table(cattle$cell_lineage))
 lineage_props_df <- lineage_props %>% data.frame() %>% rename(lineage = Var1, lineage_props = Freq)
