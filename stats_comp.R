@@ -348,21 +348,40 @@ build_contrast_table <- function(df, exp_name) {
 build_contrast_table(all_group_contrast_results, "adipo")
 build_contrast_table(all_group_contrast_results, "myo")
 
+# ALR with a robust denominator chosen by Procrustes
+# library(easyCODA)
+# mat <- new_mats[["adipo"]][["messmer"]][["dwls"]]
+# keepParts <- colMeans(mat == 0) < 0.8
+# mat_processed <- mat[, keepParts]
+# cat("\tParts kept: ", colnames(mat_processed), "\n")
 # 
-plot.princomp.acomp(princomp.acomp(mat_processed))
-pc <- princomp(mat_processed)
+# if (any(mat_processed == 0)) {
+#   mat_processed <- zCompositions::multRepl(mat_processed, label = 0, dl = rep(1e-5, ncol(mat_processed)))
+# }
+# mat_processed <- CLOSE(mat_processed)
+# res <- FINDALR(mat_processed)
+# res$procrust.ref
+# PLOT.LRA(LRA(mat_processed), )
 
-plot(pc,type="biplot")
-plot(pc,choice=c(1,3),type="biplot")
-plot(pc,type="loadings")
-plot(pc,type="loadings",scale.sdev=-1) # Downward
-plot(pc,type="relative",scale.sdev=NA) # The directions
-plot(pc,type="relative",scale.sdev=1) # one sigma Upward 
-plot(pc,type="relative",scale.sdev=-1) # one sigma Downward
-biplot(pc)
-screeplot(pc)
-loadings(pc)
+# check common zero-processed matrices' cell-types per reference
+# x <- rapply(comp_mats, function(m) {
+#   cat("__________________\n")
+#   keepParts <- colMeans(m == 0) < 0.8
+#   mat_processed <- m[, keepParts]
+#   cat("\tParts kept: ", colnames(mat_processed), "\n")
+#   
+#   if (any(mat_processed == 0)) {
+#     mat_processed <- zCompositions::multRepl(mat_processed, label = 0, dl = rep(1e-5, ncol(mat_processed)))
+#   }
+#   
+#   res <- FINDALR(mat_processed)
+#   cat("\tprocrust.cor:", paste0(colnames(mat_processed), "=", round(res$procrust.cor, 3), collapse = ", "), "\n")
+#   
+#   mat_processed
+# }, how = "replace")
+# for (exp in exps) for (ref in refs) print(Reduce(intersect, sapply(x[[exp]][[ref]], colnames)))
 
+# Further possibilities
 # james multivariate test is unnecessary, since it requires n < p and
 # is parametric.
 # james(y1, y2, a = 0.05, R = 999, graph = FALSE)
