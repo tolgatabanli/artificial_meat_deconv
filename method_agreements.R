@@ -134,5 +134,5 @@ ggplot(aes(x = ref, y = pair, size = r, color = rmse)) +
   labs(x = "Reference Dataset", y = "Method Pairs") +
   theme_minimal() +
   theme(strip.text.x = element_text(size = 12))
-ggsave("figures_agreement/pairwise_method_rmse_peason.png", width = 11)
+ggsave("figures_agreement/pairwise_method_rmse_peason.png", width = 11, height = 4)
 
