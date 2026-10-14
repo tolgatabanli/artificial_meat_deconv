@@ -6,7 +6,7 @@ source("toolkit.R")
 
 # Reading routine for composition matrices and sample metadata
 source("read_compositions_and_metadata.R")
-
+new_mats <- rapply(comp_mats, function(m) { m[m < 1e-5] <- 0; m }, how ="replace")
 
 # Stats (ref x method)
 library(compositions)
@@ -21,7 +21,7 @@ methods <- c("dwls", "rectangle", "scaden")
 run_perlog <- function(exp, ref, method) {
   cat("Processing:", exp, ref, method)
   # 1. choose matrix to analyze
-  mat <- comp_mats[[exp]][[ref]][[method]]
+  mat <- new_mats[[exp]][[ref]][[method]]
 
   meta <- if (exp == "adipo") raw_meta_adipo else raw_meta_myo
   vars_of_interest <- if (exp == "adipo") c("day", "individual") else c("day", "medium")
