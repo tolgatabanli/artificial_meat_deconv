@@ -17,8 +17,8 @@ new_mats <- rapply(comp_mats, function(mat){
 
 # input: name of the reference data set and experiment type
 # output: saves plot of barplot compositions
-plot_method_comparison <- function(ref, exp, meta, facet_formula, outdir = "figures_fractions", width = 9) {
-  mats <- comp_mats[[exp]][[ref]]
+plot_method_comparison <- function(ref, exp, meta, facet_formula, outdir = "figures_fractions", width = 9, height = 10) {
+  mats <- new_mats[[exp]][[ref]]
   
   merged <- merge_methods(mats[["rectangle"]], mats[["dwls"]], mats[["scaden"]],
                           meta = meta, method_names = c("Rectangle", "DWLS", "Scaden"))
@@ -41,33 +41,38 @@ plot_method_comparison <- function(ref, exp, meta, facet_formula, outdir = "figu
           panel.border = element_rect(color = "gray70", fill = NA, linewidth = 0.4),
           panel.spacing.y = unit(0.3, "lines"))
   
-  ggsave(file.path(outdir, paste0(ref, "_", exp, "_method_comparison.png")), plot = p, width = width)
+  ggsave(file.path(outdir, paste0(ref, "_", exp, "_method_comparison.png")), plot = p, width = width, height = height)
   invisible(p)
 }
 
 # Messmer
 plot_method_comparison("messmer", "adipo",
                        meta = raw_meta_adipo,
-                       facet_formula = day + individual ~ method, width = 12)
+                       facet_formula = individual + day ~ method, width = 12, height = 5)
 plot_method_comparison("messmer", "myo",
                        meta = raw_meta_myo,
-                       facet_formula = day + medium ~ method, width = 12)
-
+                       facet_formula = scaffold + day ~ method, width = 12, height = 5)
+plot_method_comparison("messmer_full", "adipo",
+                       meta = raw_meta_adipo,
+                       facet_formula = individual + day ~ method, width = 12, height = 5)
+plot_method_comparison("messmer_full", "myo",
+                       meta = raw_meta_myo,
+                       facet_formula = scaffold + day ~ method, width = 12, height = 5)
 # CattleAtlas
 plot_method_comparison("cattle", "adipo",
                        meta = raw_meta_adipo,
-                       facet_formula = day + individual ~ method, width = 12)
+                       facet_formula = individual + day ~ method, width = 12, height = 5)
 plot_method_comparison("cattle", "myo",
                        meta = raw_meta_myo,
-                       facet_formula = day + medium ~ method, width = 12)
+                       facet_formula = scaffold + day ~ method, width = 12, height = 5)
 
 # Wang2023
 plot_method_comparison("wang", "adipo",
                        meta = raw_meta_adipo,
-                       facet_formula = day + individual ~ method, width = 12)
+                       facet_formula = individual + day ~ method, width = 12, height = 5)
 plot_method_comparison("wang", "myo",
                        meta = raw_meta_myo,
-                       facet_formula = day + medium ~ method, width = 12)
+                       facet_formula = scaffold + day ~ method, width = 12, height = 5)
 
 # Cell-type-wise raw proportions of selected cell-types across days
 messmerCellTypes <- c("FAPs", "SCs", "SMMCs", "Myocytes")
