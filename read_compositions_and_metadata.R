@@ -81,7 +81,7 @@ raw_meta_adipo <- read_sample_meta("/nfs/data2/huji_artificial_meat/adipogenesis
 raw_meta_myo <- read_sample_meta("/nfs/data2/huji_artificial_meat/myogenesis/sample_sheet_cleaned.csv") %>%
   dplyr::select(sample_id, day, group, individual, bio_replicate) %>%
   filter(!grepl("Satt", sample_id)) %>%
-  separate_wider_delim(group, delim = "_", names = c(NA, "medium")) %>%
+  separate_wider_delim(group, delim = "_", names = c(NA, "scaffold")) %>%
   mutate(sample_id = gsub(".*_", "", sample_id))
 
 # composition matrices: experiment -> reference -> method
