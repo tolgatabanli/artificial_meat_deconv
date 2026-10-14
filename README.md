@@ -34,6 +34,7 @@ artificial_meat_deconv
 ├── plot_cell_fractions.R              #> Generates the cell-type fraction stacked barplots
 ├── read_compositions_and_metadata.R   #> Utility script that reads fraction estimates from all references (counts_*) and all methods (DWLS, Rectangle, Scaden)
 ├── rectangle_environment.yml          #> Conda environment (Python packages) used for Rectangle
+├── renv.lock                          #> R environment (R packages), project-wide; from renv
 ├── stats_comp.R                       #> Statistical analysis of compositions via log-ratios of cell types
 └── toolkit.R                          #> Utility script: TPM-reading routine, cross-method composition-matrix merge function, a patched MAST function with caching, and a parallel-DWLS deconvolution function
 ```
